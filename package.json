@@ -1,0 +1,43 @@
+{
+  "name": "agent-harness",
+  "version": "0.1.0",
+  "description": "Bootstrap infrastructure for long-running AI agents. Based on Anthropic research.",
+  "type": "module",
+  "bin": {
+    "agent-harness": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "claude",
+    "llm",
+    "automation",
+    "context-engineering"
+  ],
+  "author": "Daniel Wilson",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/danielgwilson/agent-harness"
+  }
+}
