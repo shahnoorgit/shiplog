@@ -82,30 +82,41 @@ With `--features` flag, also creates `docs/FEATURES.json` for global feature tra
 
 ## How It Works
 
-### Three Commands: /status, /plan, /ramp
+### Primary Command: /ship
 
 | Command | Use When | What It Does |
 |---------|----------|--------------|
-| `/status` | **Any time** — quick check | Shows current state + runs health checks |
-| `/plan` | Starting a **new** initiative | Asks about goals, explores codebase, creates sprint file |
-| `/ramp` | **Continuing** existing work | Gets bearings, picks next task, works incrementally |
+| `/ship` | **Any time** | Auto-detects mode: plans new work OR continues existing sprint |
+| `/ship design` | **Creative work** | Lighter structure for aesthetic/UI work |
+| `/ship status` | **Quick check** | Shows current state + health checks |
+
+### Legacy Commands (still supported)
+
+| Command | Notes |
+|---------|-------|
+| `/plan` | Use `/ship` instead — it auto-detects when to plan |
+| `/ramp` | Use `/ship` instead — it auto-detects when to continue |
+| `/status` | Still works, alias for `/ship status` |
 
 **Example workflow:**
 
 ```
-Day 1: /plan "Add referral system"
+Day 1: /ship "Add referral system"
+  └── Detects no sprint → enters planning mode
   └── Creates docs/sprints/2024-12-04-referral-system.json
-  └── Adds tasks to PROGRESS.md
   └── Starts working on first feature
 
-Day 2: /ramp
-  └── Reads PROGRESS.md, HANDOFF.md
+Day 2: /ship
+  └── Detects existing sprint → continues
   └── Picks up where Day 1 left off
-  └── Continues working on sprint
 
-Day 5: (Sprint complete) /plan "Mobile redesign"
+Day 3: /ship design
+  └── Working on UI polish
+  └── Lighter structure, visual iteration
+
+Day 5: /ship "Mobile redesign"
+  └── All features passed → new planning mode
   └── Creates new sprint file
-  └── New initiative begins
 ```
 
 ### Session Workflow
@@ -114,10 +125,10 @@ Day 5: (Sprint complete) /plan "Mobile redesign"
 ┌─────────────────────────────────────────────────────────────┐
 │                     SESSION START                            │
 ├─────────────────────────────────────────────────────────────┤
-│  1. Run /ramp (continue) or /plan (new initiative)           │
-│  2. Read PROGRESS.md, HANDOFF.md, DECISIONS.md              │
+│  1. Run /ship (auto-detects plan vs continue mode)           │
+│  2. Read PROGRESS.md, HANDOFF.md, sprint files              │
 │  3. Verify tests pass and dev server starts                  │
-│  4. Pick ONE task from PROGRESS.md or sprint file            │
+│  4. Pick ONE task from sprint file                           │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼

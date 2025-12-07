@@ -43,7 +43,7 @@ export const initCommand = new Command("init")
     console.log(`\n🚢 Initializing shiplog for: ${projectName}\n`);
 
     // Create directories
-    const dirs = [".claude/commands", "docs", "docs/sprints"];
+    const dirs = [".claude/commands", ".claude/hooks", "docs", "docs/sprints"];
     for (const dir of dirs) {
       const dirPath = path.join(cwd, dir);
       if (!fs.existsSync(dirPath)) {
@@ -102,6 +102,23 @@ export const initCommand = new Command("init")
         minimalInclude: true,
       },
 
+      // V2: New unified commands
+      {
+        path: ".claude/commands/ship.md",
+        content: getSHIPmd(projectName),
+        minimalInclude: true,
+      },
+      {
+        path: ".claude/commands/ship-design.md",
+        content: getSHIPDESIGNmd(projectName),
+        minimalInclude: true,
+      },
+      {
+        path: ".claude/hooks/session-end.sh",
+        content: getSessionEndHookSh(),
+        minimalInclude: true,
+      },
+
       // Optional (require explicit flag)
       {
         path: "docs/FEATURES.json",
@@ -157,10 +174,29 @@ export const initCommand = new Command("init")
     console.log("Next steps:");
     console.log("  1. Review and customize CLAUDE.md for your project");
     console.log("  2. Add your project's commands and patterns");
-    console.log("  3. Use /ramp to start each new agent session\n");
+    console.log("  3. Use /ship to start working (auto-detects plan vs continue mode)");
+    console.log("  4. Use /ship design for aesthetic/creative work\n");
   });
 
 // Template functions
+
+// Shared persona - baked into all commands
+function getDriverSeatPersona(): string {
+  return `## Your Role
+
+You are not an assistant. You are the **owner** of this project.
+
+- **Make decisions**, don't ask for permission on technical choices
+- **Log decisions** in DECISIONS.md for the record
+- **Use sub-agents** for exploration and parallel work (Task tool with Explore/Plan agents)
+- **Use TodoWrite** to track your work and show progress
+- **Commit frequently**, leave code in a working state
+- **If blocked**, ask clearly and wait. Otherwise, **DRIVE**.
+
+You have full autonomy over: code changes, technical decisions, git commits, architecture, refactoring, dependencies.
+Ask first for: spending money, external accounts/services, destructive operations.
+`;
+}
 
 function getCLAUDEmd(projectName: string): string {
   return `# ${projectName}
@@ -467,7 +503,9 @@ Every session:
 }
 
 function getPLANmd(projectName: string): string {
-  return `You are starting a **new initiative** on **${projectName}**.
+  return `> **Note:** Consider using \`/ship\` instead — it auto-detects whether to plan or continue.
+
+You are starting a **new initiative** on **${projectName}**.
 
 ## Step 1: Understand the Goal
 
@@ -627,7 +665,9 @@ End with a clear recommendation:
 }
 
 function getRAMPmd(projectName: string): string {
-  return `You are **continuing** work on **${projectName}**.
+  return `> **Note:** Consider using \`/ship\` instead — it auto-detects whether to plan or continue.
+
+You are **continuing** work on **${projectName}**.
 
 > **Tip:** Run \`/status\` first for a quick health check before diving in.
 
@@ -733,7 +773,240 @@ function getSETTINGSjson(): string {
       "Write(**/*)"
     ],
     "deny": []
+  },
+  "hooks": {
+    "SessionEnd": [
+      {
+        "hooks": [{
+          "type": "command",
+          "command": "bash $CLAUDE_PROJECT_DIR/.claude/hooks/session-end.sh"
+        }]
+      }
+    ]
   }
 }
+`;
+}
+
+// V2: Unified /ship command with smart mode detection
+function getSHIPmd(projectName: string): string {
+  return `You are working on **${projectName}**.
+
+${getDriverSeatPersona()}
+
+---
+
+## Quick Mode Detection
+
+Check what mode to use:
+
+1. Run \`ls docs/sprints/*.json 2>/dev/null | head -1\` to find active sprints
+2. If a sprint exists with incomplete features → **Continue Mode**
+3. If no sprint exists or all features pass → **Planning Mode**
+4. If user provides a new goal/task → **Planning Mode**
+
+---
+
+## Continue Mode (Sprint In Progress)
+
+### Get Bearings (2 min max)
+1. Read \`docs/PROGRESS.md\` — What's done? What's next?
+2. Read \`docs/HANDOFF.md\` — Last session's state
+3. Read the active sprint file in \`docs/sprints/\`
+4. Run \`git status\` — Any uncommitted changes?
+
+### Verify Environment
+\`\`\`bash
+git status              # Clean state?
+npm test                # Tests passing?
+npm run dev             # Dev server starts?
+\`\`\`
+
+### Execute
+1. Pick next incomplete feature from sprint file
+2. Work on **ONE feature at a time**
+3. Commit frequently with descriptive messages
+4. Mark feature as \`passes: true\` when tested end-to-end
+5. Update PROGRESS.md as items complete
+
+### Before Ending
+1. Update \`docs/HANDOFF.md\` with current state
+2. Commit all work
+3. Leave codebase in clean, working state
+
+---
+
+## Planning Mode (New Initiative)
+
+If starting new work:
+
+1. **Ask**: "What are we building? Describe the goal."
+2. **Explore**: Read codebase for relevant patterns
+3. **Clarify**: Ask questions about scope, approach, constraints
+4. **Design**: Create implementation plan
+5. **Create Sprint**: Save to \`docs/sprints/YYYY-MM-DD-<slug>.json\`
+6. **Update PROGRESS.md**: Add new initiative
+7. **Begin**: Start on first feature
+
+### Sprint File Format
+\`\`\`json
+{
+  "initiative": "Initiative Name",
+  "created": "YYYY-MM-DD",
+  "status": "in_progress",
+  "features": [
+    {
+      "id": "feat-001",
+      "description": "User can do X",
+      "steps": ["Step 1", "Step 2", "Verify"],
+      "passes": false
+    }
+  ]
+}
+\`\`\`
+
+**CRITICAL**: Feature descriptions are IMMUTABLE. You can only update \`passes\` to \`true\`.
+
+---
+
+## Post-Compaction Recovery
+
+If you've just resumed after context compaction:
+
+1. **Re-read** the current sprint file immediately
+2. **Check alignment**: "Is what I'm about to do aligned with the sprint?"
+3. **If drifted**: Stop and re-orient before continuing
+4. **If aligned**: Continue with renewed focus
+
+This prevents drift after context loss.
+
+---
+
+## Quick Status Check
+
+Run \`/ship status\` or \`/status\` to see:
+- Current sprint progress
+- Recent commits
+- Any uncommitted changes
+- Test status
+
+---
+
+**Key principle:** One feature at a time. Leave code working. Update HANDOFF.md before ending.
+`;
+}
+
+// V2: Design mode for creative/aesthetic work
+function getSHIPDESIGNmd(projectName: string): string {
+  return `You are doing **design work** on **${projectName}**.
+
+${getDriverSeatPersona()}
+
+---
+
+## Design Mode
+
+This is a **lighter structure** for creative and aesthetic work.
+
+### Key Differences from Implementation Mode:
+- **No sprint file required** — iterate visually instead of checking boxes
+- **Show, don't tell** — make changes and demonstrate them
+- **Aesthetic judgment > checklists** — trust your design instincts
+- **Faster iteration** — commit less frequently, experiment more
+
+---
+
+## Workflow
+
+### 1. Understand the Vision
+- What's the aesthetic goal? (e.g., "dark mode", "premium feel", "playful")
+- What's the target audience? (developers, consumers, enterprise)
+- Any reference designs or inspirations?
+
+### 2. Use the Frontend Design Skill
+If available, invoke the \`frontend-design\` skill for high-quality UI work:
+\`\`\`
+/skill frontend-design
+\`\`\`
+
+### 3. Iterate Visually
+- Make changes
+- Take screenshots or describe the result
+- Get feedback
+- Refine
+
+### 4. When Satisfied
+- Commit the final design
+- Update PROGRESS.md with what was accomplished
+- Optionally: create a sprint file to track remaining polish items
+
+---
+
+## Design Principles
+
+- **Consistency** — Colors, spacing, typography should feel unified
+- **Hierarchy** — Important things should be visually prominent
+- **Breathing room** — Don't crowd elements; whitespace is good
+- **Feedback** — Interactive elements should respond (hover, active states)
+- **Polish** — Transitions, shadows, and micro-interactions matter
+
+---
+
+## Quick Commands
+
+\`\`\`bash
+npm run dev                    # Start dev server for live preview
+git diff --stat                # See what changed
+git add -p                     # Stage changes selectively
+\`\`\`
+
+---
+
+**Key principle:** For design work, visual iteration beats checklists. Make it look good first, then document.
+`;
+}
+
+// V2: Session end hook script
+function getSessionEndHookSh(): string {
+  return `#!/bin/bash
+# Session End Hook - Captures metadata for cross-session continuity
+# This script runs automatically when a Claude Code session ends
+
+set -e
+
+# Read hook input from stdin
+input=$(cat)
+
+# Extract session data
+transcript_path=$(echo "$input" | jq -r '.transcript_path // empty')
+cwd=$(echo "$input" | jq -r '.cwd // empty')
+reason=$(echo "$input" | jq -r '.reason // "unknown"')
+
+# Only proceed if we have a working directory
+if [ -z "$cwd" ] || [ ! -d "$cwd" ]; then
+  exit 0
+fi
+
+cd "$cwd"
+
+# Create metadata directory if needed
+mkdir -p .claude
+
+# Capture session metadata
+{
+  echo "{"
+  echo "  \\"timestamp\\": \\"$(date -Iseconds)\\","
+  echo "  \\"reason\\": \\"$reason\\","
+  echo "  \\"files_changed\\": ["
+  git diff --name-only HEAD 2>/dev/null | head -10 | sed 's/.*/"&"/' | paste -sd, - || echo ""
+  echo "  ],"
+  echo "  \\"recent_commits\\": ["
+  git log --oneline -5 2>/dev/null | sed 's/.*/"&"/' | paste -sd, - || echo ""
+  echo "  ],"
+  echo "  \\"transcript\\": \\"$transcript_path\\""
+  echo "}"
+} >> .claude/session-metadata.jsonl
+
+exit 0
 `;
 }
