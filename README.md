@@ -1,224 +1,210 @@
-# 🚢 shiplog
+# shiplog
 
-Infrastructure for long-running AI agents. Track progress, decisions, and handoffs across sessions.
+[![npm version](https://img.shields.io/npm/v/shiplog.svg)](https://www.npmjs.com/package/shiplog)
+[![npm downloads](https://img.shields.io/npm/dm/shiplog.svg)](https://www.npmjs.com/package/shiplog)
+[![CI](https://github.com/danielgwilson/shiplog/actions/workflows/ci.yml/badge.svg)](https://github.com/danielgwilson/shiplog/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Based on [Anthropic's research](https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents) on effective harnesses for agents that work across multiple context windows.
+**Put Claude in the driver's seat.**
+
+shiplog is infrastructure for long-running AI agent sessions. It gives Claude the context and structure to *drive* your projects autonomously — planning work, tracking progress, and picking up exactly where it left off across sessions.
+
+```bash
+npx shiplog init
+```
+
+---
 
 ## The Problem
 
-AI agents face a fundamental challenge: **they work in discrete sessions, and each new session starts with no memory of what came before.**
+AI agents forget everything between sessions. Without structure, they:
 
-Without infrastructure, agents tend to:
-- Try to one-shot complex projects (running out of context mid-implementation)
-- Declare victory prematurely (seeing progress and assuming work is done)
-- Leave code in broken states (no clean handoffs between sessions)
-- Re-litigate past decisions (forgetting why things were done)
+- **One-shot complex projects** — running out of context mid-implementation
+- **Declare victory prematurely** — seeing some progress and assuming done
+- **Leave broken states** — no clean handoffs between sessions
+- **Re-litigate decisions** — forgetting why things were done
 
-## The Solution
+You end up babysitting instead of shipping.
 
-A **harness** — simple file-based infrastructure that enables:
-- **Progress tracking** — Know what's done and what's next
-- **Decision logging** — Remember why things were done
-- **Clean handoffs** — Each session picks up where the last left off
-- **Incremental progress** — One feature at a time, always working code
+## The Solution: Let Claude Drive
 
-## Installation
+shiplog creates a simple file-based harness that puts Claude in control:
 
-```bash
-npx shiplog init
+```
+/ship "Add user authentication"
 ```
 
-Or install globally:
+Claude takes it from there:
+1. **Plans the work** — breaks it into features, creates a sprint file
+2. **Tracks progress** — knows what's done, what's next
+3. **Handles handoffs** — captures state at session end, restores at session start
+4. **Remembers decisions** — logs the *why*, not just the *what*
+
+You review, approve, and steer. Claude executes.
+
+---
+
+## Quick Start
 
 ```bash
-npm install -g shiplog
-shiplog init
-```
-
-## Usage
-
-### Initialize a project
-
-```bash
-# Full setup (recommended)
+# Initialize in your project
 npx shiplog init
 
-# With custom project name
-npx shiplog init --name "my-project"
-
-# Minimal setup (essential files only)
-npx shiplog init --minimal
-
-# Skip optional files
-npx shiplog init --no-voice --no-features
-
-# Overwrite existing files
-npx shiplog init --force
+# Then in Claude Code, just run:
+/ship
 ```
 
-### What it creates
+That's it. Claude auto-detects whether to plan new work or continue existing work.
+
+---
+
+## How It Works
+
+### One Command: `/ship`
+
+| Command | What It Does |
+|---------|--------------|
+| `/ship` | Auto-detects: plans new work OR continues existing sprint |
+| `/ship "feature name"` | Starts planning a specific feature |
+| `/ship design` | Lighter mode for creative/UI work |
+| `/ship status` | Quick health check |
+
+### Example Workflow
+
+```
+Day 1: /ship "Add referral system"
+       └── Claude plans → creates sprint file → starts building
+
+Day 2: /ship
+       └── Claude continues → picks up where Day 1 left off
+
+Day 3: /ship
+       └── Claude finishes → all features pass → ready for next thing
+
+Day 4: /ship "Notification system"
+       └── New sprint begins
+```
+
+### What It Creates
 
 ```
 your-project/
 ├── .claude/
 │   ├── commands/
-│   │   ├── ship.md              # /ship command — unified entry point (v2)
-│   │   ├── ship-design.md       # /ship design — creative/aesthetic mode
-│   │   ├── status.md            # /status command — health check & overview
-│   │   ├── ramp.md              # /ramp command — redirects to /ship
-│   │   └── plan.md              # /plan command — redirects to /ship
+│   │   └── ship.md           # The magic — driver's seat prompt
 │   ├── hooks/
-│   │   ├── session-start.sh     # Displays previous session info
-│   │   └── session-end.sh       # Captures session metadata (JSONL)
-│   └── settings.local.json      # Tool permissions + hooks config
+│   │   ├── session-start.sh  # Auto-restores context
+│   │   └── session-end.sh    # Auto-captures state
+│   └── settings.local.json   # Permissions + hooks config
 │
 ├── docs/
-│   ├── sprints/                 # Per-initiative feature tracking
-│   ├── PROGRESS.md              # Task tracking across sessions
-│   ├── DECISIONS.md             # Decision log with reasoning
-│   ├── HANDOFF.md               # Current session state
-│   └── CLAUDE_VOICE.md          # Agent persona template (optional)
+│   ├── sprints/              # Per-initiative tracking
+│   ├── PROGRESS.md           # What's done, what's next
+│   ├── DECISIONS.md          # Why things were done
+│   └── HANDOFF.md            # Session state
 │
-└── CLAUDE.md                    # Project instructions
+└── CLAUDE.md                 # Project instructions
 ```
 
-With `--features` flag, also creates `docs/FEATURES.json` for global feature tracking.
+---
 
-## How It Works
+## The "Driver's Seat" Philosophy
 
-### Primary Command: /ship
+Most agent setups treat AI as a tool you direct. shiplog flips this:
 
-| Command | Use When | What It Does |
-|---------|----------|--------------|
-| `/ship` | **Any time** | Auto-detects mode: plans new work OR continues existing sprint |
-| `/ship design` | **Creative work** | Lighter structure for aesthetic/UI work |
-| `/ship status` | **Quick check** | Shows current state + health checks |
+> **You're the passenger. Claude is driving.**
 
-### Legacy Commands (still supported)
+This means:
+- Claude proposes the plan, you approve it
+- Claude decides task order and implementation details
+- Claude asks *you* questions when blocked
+- You intervene when needed, not continuously
 
-| Command | Notes |
-|---------|-------|
-| `/plan` | Use `/ship` instead — it auto-detects when to plan |
-| `/ramp` | Use `/ship` instead — it auto-detects when to continue |
-| `/status` | Still works, alias for `/ship status` |
+The result? Less babysitting, more shipping.
 
-**Example workflow:**
+---
 
+## Key Features
+
+### Session Continuity
+Hooks automatically capture context at session end and restore it at session start. No more "where were we?"
+
+### Sprint-Based Planning
+Work is organized into sprints with explicit feature tracking. Claude knows exactly what's done and what's left.
+
+### Decision Logging
+The *why* matters as much as the *what*. Decisions are logged so future sessions don't re-litigate past choices.
+
+### Graceful Upgrades
+Already using shiplog v1? Just run:
+```bash
+npx shiplog upgrade
 ```
-Day 1: /ship "Add referral system"
-  └── Detects no sprint → enters planning mode
-  └── Creates docs/sprints/2024-12-04-referral-system.json
-  └── Starts working on first feature
+Your content is preserved. Only templates are updated.
 
-Day 2: /ship
-  └── Detects existing sprint → continues
-  └── Picks up where Day 1 left off
-
-Day 3: /ship design
-  └── Working on UI polish
-  └── Lighter structure, visual iteration
-
-Day 5: /ship "Mobile redesign"
-  └── All features passed → new planning mode
-  └── Creates new sprint file
-```
-
-### Session Workflow
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     SESSION START                            │
-├─────────────────────────────────────────────────────────────┤
-│  1. Run /ship (auto-detects plan vs continue mode)           │
-│  2. Read PROGRESS.md, HANDOFF.md, sprint files              │
-│  3. Verify tests pass and dev server starts                  │
-│  4. Pick ONE task from sprint file                           │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                     SESSION WORK                             │
-├─────────────────────────────────────────────────────────────┤
-│  • Work on ONE feature at a time                             │
-│  • Commit frequently with descriptive messages               │
-│  • Update PROGRESS.md as items complete                      │
-│  • Log significant decisions in DECISIONS.md                 │
-│  • Mark sprint features as passing when tested               │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                     SESSION END                              │
-├─────────────────────────────────────────────────────────────┤
-│  1. Update HANDOFF.md with current state                     │
-│  2. Commit all work in progress                              │
-│  3. List open questions for human                            │
-│  4. Leave codebase in clean, working state                   │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### Key Files
-
-| File | Purpose | When to Update |
-|------|---------|----------------|
-| `PROGRESS.md` | Track what's done and what's next | After completing tasks |
-| `DECISIONS.md` | Log significant decisions with reasoning | When making non-obvious choices |
-| `HANDOFF.md` | Capture session state for next session | End of every session |
-| `docs/sprints/*.json` | Per-initiative feature tracking | Created via /plan, updated as features pass |
-| `CLAUDE.md` | Project-specific instructions | When project structure changes |
+---
 
 ## CLI Reference
 
-```
-Usage: shiplog [command] [options]
+```bash
+# Initialize new project
+npx shiplog init
+npx shiplog init --name "my-project"
+npx shiplog init --minimal        # Essential files only
+npx shiplog init --force          # Overwrite existing
 
-Commands:
-  init          Initialize shiplog in current directory
-  upgrade       Upgrade existing v1 installation to v2
-
-Options:
-  -V, --version    Output version number
-  -h, --help       Display help
-
-Init Options:
-  -n, --name <name>    Project name for CLAUDE.md header
-  -m, --minimal        Only essential files (PROGRESS, DECISIONS, HANDOFF, /ramp, /plan)
-  --no-voice           Skip CLAUDE_VOICE.md template
-  --features           Include global FEATURES.json (use /plan for per-initiative instead)
-  -f, --force          Overwrite existing files
-
-Upgrade Options:
-  -f, --force          Re-apply templates even if already v2
-  --no-backup          Skip backing up existing commands
+# Upgrade existing v1 project to v2
+npx shiplog upgrade
+npx shiplog upgrade --force       # Re-apply even if already v2
 ```
 
-## Research
+---
 
-This tool is based on research from:
+## Based On Research
 
-- **Anthropic** — [Effective harnesses for long-running agents](https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents)
-- **Anthropic** — [Effective context engineering for AI agents](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)
-- **LangChain** — [Context Engineering for Agents](https://blog.langchain.com/context-engineering-for-agents/)
-- **JetBrains** — [Smarter Context Management](https://blog.jetbrains.com/research/2025/12/efficient-context-management/)
+Built on insights from:
 
-See [docs/RESEARCH.md](docs/RESEARCH.md) for a comprehensive synthesis of best practices.
+- [Anthropic — Effective harnesses for long-running agents](https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents)
+- [Anthropic — Context engineering for AI agents](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)
+- [LangChain — Context Engineering for Agents](https://blog.langchain.com/context-engineering-for-agents/)
 
-## Why Simple Files?
+See [`docs/RESEARCH.md`](docs/RESEARCH.md) for a deep dive.
+
+---
+
+## Why Plain Files?
 
 > "Simple structures beat complex automation for long-running agents."
-> — Anthropic Research
 
-The harness uses plain markdown and JSON files because:
+- **Git-trackable** — full history of progress and decisions
+- **Human-readable** — easy to review and edit
+- **No dependencies** — works with any project
+- **Agent-friendly** — LLMs handle text better than databases
 
-1. **Git-trackable** — Full history of progress and decisions
-2. **Human-readable** — Easy to review and edit manually
-3. **No dependencies** — Works with any project, any language
-4. **Agent-friendly** — LLMs handle text better than databases
+---
+
+## Contributing
+
+Contributions welcome! Please read [`docs/RESEARCH.md`](docs/RESEARCH.md) first to understand the design principles.
+
+---
 
 ## License
 
 MIT
 
-## Contributing
+---
 
-Contributions welcome! Please read the research in `docs/RESEARCH.md` first to understand the design principles.
+## Author
+
+**Daniel G Wilson**
+
+- [@the_danny_g](https://x.com/the_danny_g)
+- [LinkedIn](https://linkedin.com/in/danielgwilson)
+- [GitHub](https://github.com/danielgwilson)
+
+---
+
+<p align="center">
+  <i>Stop babysitting. Start shipping.</i>
+</p>
