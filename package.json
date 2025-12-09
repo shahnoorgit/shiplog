@@ -22,7 +22,7 @@
     "automation",
     "context-engineering"
   ],
-  "author": "Daniel Wilson",
+  "author": "Daniel G Wilson",
   "license": "MIT",
   "dependencies": {
     "commander": "^12.1.0"
