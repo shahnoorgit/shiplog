@@ -3,54 +3,63 @@
 > Capture current session state so the next session can pick up seamlessly.
 
 **Last Updated:** 2025-12-08
-**Status:** E2E Tests Complete
+**Status:** PUBLISHED & PUBLIC
 
 ---
 
 ## What Was Done This Session
 
-- Added comprehensive E2E test suite using Vitest
-- 23 tests covering:
-  - `init` command (file creation, project name, --force, mcpServer preservation)
-  - `upgrade` command (v1→v2, backup, mcpServer preservation, already-upgraded detection)
-  - settings.local.json format (valid JSON, hook matcher format, permissions)
-  - Hook scripts (session-end.sh JSONL output, session-start.sh display)
-  - Command file content (driver's seat persona, mode detection, /ship redirects)
-- Set up GitHub Actions CI (tests on Node 18/20/22)
-- Excluded tests from TypeScript build to avoid duplicate test runs
+### Published to npm
+- Ran pre-publish security audit (no secrets, clean package)
+- Added LICENSE file (MIT)
+- Fixed executable permission on dist/index.js
+- Published v1.1.0 → v1.1.1 (author name) → v1.1.2 (new README)
+- Package live at: https://www.npmjs.com/package/shiplog
+
+### Cleaned up for public release
+- Moved conversation logs to `.local/` (gitignored)
+- Scrubbed git history with `git-filter-repo`
+- Force pushed clean history
+
+### New README
+- Added badges (npm version, downloads, CI, license)
+- Emphasized "driver's seat" philosophy as unique value prop
+- Added author socials (X, LinkedIn, GitHub)
+- Cleaner structure, punchier copy
+
+### GitHub repo configured
+- Description and topics set via `gh repo edit`
+- Issues enabled
+- Made repository PUBLIC
 
 ---
 
 ## Current State
 
-- **Git:** Clean after commit
+- **npm:** v1.1.2 published and live
+- **GitHub:** Public at github.com/danielgwilson/shiplog
+- **Git:** Clean
 - **Tests:** 23 passing
-- **Build:** Working
+- **CI:** Green
 
 ---
 
 ## What's Next
 
-1. Publish to npm (make `npx shiplog init` work publicly)
-2. Consider adding more edge case tests
+1. Share / promote (tweet, post, get feedback)
+2. Add more test coverage if needed
+3. Iterate based on user feedback
 
 ---
 
 ## Open Questions for Human
 
-None - E2E test suite is complete and CI is configured.
+None - shiplog is published and public! 🚢
 
 ---
 
-## Files Changed This Session
+## Key Links
 
-```
-package.json                    # Added test scripts, vitest dep
-tsconfig.json                   # Excluded __tests__ from build
-vitest.config.ts                # Test configuration
-src/__tests__/e2e.test.ts       # 23 E2E tests
-.github/workflows/ci.yml        # GitHub Actions CI
-docs/sprints/2025-12-08-e2e-tests.json
-docs/PROGRESS.md
-docs/HANDOFF.md
-```
+- npm: https://www.npmjs.com/package/shiplog
+- GitHub: https://github.com/danielgwilson/shiplog
+- Author X: https://x.com/the_danny_g
