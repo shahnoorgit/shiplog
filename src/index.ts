@@ -16,7 +16,7 @@ program
       "Also: /ship design (creative work), /status (health check)\n\n" +
       "Learn more: https://github.com/danielgwilson/shiplog"
   )
-  .version("1.1.1");
+  .version("1.1.2");
 
 program.addCommand(initCommand);
 program.addCommand(upgradeCommand);
