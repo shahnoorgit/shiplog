@@ -41,7 +41,7 @@
         "Retry up to N times with backoff",
         "Record failures in state"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "robust-005",
