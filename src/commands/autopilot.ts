@@ -293,13 +293,57 @@ function runClaudeSession(
     let timedOut = false;
     let timeoutHandle: NodeJS.Timeout | null = null;
 
-    // Use async spawn for real-time streaming to terminal
-    // Key insight from Agent SDK: real-time output requires async event-based approach
-    const claude = spawn("claude", ["--print"], {
-      cwd,
-      stdio: ["pipe", "inherit", "inherit"],  // stdin=pipe, stdout/stderr=terminal
-      env: { ...process.env },
-    });
+    // Use streaming JSON output for real-time output
+    // Note: stream-json requires --verbose flag
+    const claude = spawn(
+      "claude",
+      ["-p", "--verbose", "--output-format", "stream-json", "--include-partial-messages"],
+      {
+        cwd,
+        stdio: ["pipe", "pipe", "pipe"],  // Need stdin to send prompt
+        env: { ...process.env },
+      }
+    );
+
+    // Forward streaming output to terminal - parse stream-json format
+    let jsonBuffer = "";  // Buffer for incomplete JSON lines
+    if (claude.stdout) {
+      claude.stdout.on("data", (data: Buffer) => {
+        jsonBuffer += data.toString();
+        const lines = jsonBuffer.split("\n");
+        // Keep last potentially incomplete line in buffer
+        jsonBuffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const event = JSON.parse(line);
+            // Handle stream_event wrapper - extract inner event
+            if (event.type === "stream_event" && event.event) {
+              const inner = event.event;
+              // content_block_delta contains streaming text chunks
+              if (inner.type === "content_block_delta" && inner.delta?.type === "text_delta") {
+                process.stdout.write(inner.delta.text);
+              }
+            }
+          } catch {
+            // Not valid JSON - skip
+          }
+        }
+      });
+    }
+    if (claude.stderr) {
+      claude.stderr.on("data", (data: Buffer) => {
+        // stderr might have useful error info - show it
+        process.stderr.write(data);
+      });
+    }
+
+    // Send prompt via stdin
+    if (claude.stdin) {
+      claude.stdin.write(prompt);
+      claude.stdin.end();
+    }
 
     // Track process for interrupt handling
     currentClaudeProcess = claude;
@@ -315,9 +359,7 @@ function runClaudeSession(
       }, timeoutSeconds * 1000);
     }
 
-    // Write prompt to stdin and close it
-    claude.stdin.write(prompt);
-    claude.stdin.end();
+    // Prompt is sent via stdin above
 
     claude.on("close", (code) => {
       currentClaudeProcess = null;
