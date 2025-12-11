@@ -31,7 +31,7 @@
         "Track sprint file updates",
         "Consider file changes as soft progress"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "robust-004",
