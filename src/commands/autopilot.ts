@@ -209,7 +209,8 @@ function runClaudeSession(
     fs.writeFileSync(promptPath, prompt);
 
     // Spawn claude with the prompt
-    const claude = spawn("claude", ["--print", "-p", prompt], {
+    // Note: prompt is a positional argument, NOT a -p flag (-p means --print)
+    const claude = spawn("claude", ["--print", prompt], {
       cwd,
       stdio: ["inherit", "pipe", "pipe"],
       env: { ...process.env },
