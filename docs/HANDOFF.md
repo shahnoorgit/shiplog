@@ -3,7 +3,7 @@
 > Capture current session state so the next session can pick up seamlessly.
 
 **Last Updated:** 2025-12-11
-**Status:** v1.1.4 ready to publish
+**Status:** v1.1.4 published
 
 ---
 
@@ -39,15 +39,15 @@ Files changed:
 
 ## What's Next
 
-1. Publish v1.1.4 to npm
-2. Users can run `shiplog doctor` to check their installation
-3. Users can run `shiplog doctor --fix` to auto-repair issues
+1. Users can run `shiplog doctor` to check their installation
+2. Users can run `shiplog doctor --fix` to auto-repair issues
+3. Promote / share - tweet, get feedback
 
 ---
 
 ## Open Questions for Human
 
-Ready to publish v1.1.4?
+None - v1.1.4 is live!
 
 ---
 

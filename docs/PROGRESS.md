@@ -38,7 +38,6 @@
 
 | Task | Priority | Notes |
 |------|----------|-------|
-| Publish v1.1.4 | P1 | Doctor command ready |
 | Promote / share | P2 | Tweet, post, get feedback |
 
 ---
