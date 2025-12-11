@@ -1,7 +1,13 @@
 import { Command } from "commander";
 import * as fs from "fs";
 import * as path from "path";
-import { spawn, execSync } from "child_process";
+import { spawn, execSync, ChildProcess } from "child_process";
+
+// Module-level state for interrupt handling
+let currentClaudeProcess: ChildProcess | null = null;
+let currentState: AutopilotState | null = null;
+let currentCwd: string | null = null;
+let isInterrupted = false;
 
 interface AutopilotOptions {
   maxIterations: number;
@@ -29,6 +35,44 @@ interface AutopilotState {
   stallCount: number;
   sessions: SessionLog[];
   status: "running" | "completed" | "stalled" | "interrupted";
+}
+
+function handleInterrupt(): void {
+  if (isInterrupted) return; // Prevent double handling
+  isInterrupted = true;
+
+  console.log("\n\n⚠️  Interrupt received (Ctrl+C)");
+  console.log("💾 Saving state...");
+
+  // Kill Claude process if running
+  if (currentClaudeProcess && !currentClaudeProcess.killed) {
+    console.log("🛑 Stopping Claude session...");
+    currentClaudeProcess.kill("SIGTERM");
+  }
+
+  // Update and save state
+  if (currentState && currentCwd) {
+    currentState.status = "interrupted";
+
+    // Mark current session as interrupted if one is running
+    const runningSession = currentState.sessions.find(s => s.status === "running");
+    if (runningSession) {
+      runningSession.status = "error";
+      runningSession.endTime = new Date().toISOString();
+    }
+
+    const statePath = path.join(currentCwd, ".shiplog/autopilot-state.json");
+    fs.writeFileSync(statePath, JSON.stringify(currentState, null, 2) + "\n");
+    console.log("✅ State saved to .shiplog/autopilot-state.json");
+    console.log("   Run 'shiplog autopilot' to resume.\n");
+  }
+
+  process.exit(130); // Standard exit code for SIGINT
+}
+
+function setupInterruptHandler(): void {
+  process.on("SIGINT", handleInterrupt);
+  process.on("SIGTERM", handleInterrupt);
 }
 
 function getCommitCount(cwd: string): number {
@@ -215,17 +259,22 @@ function runClaudeSession(
       env: { ...process.env },
     });
 
+    // Track process for interrupt handling
+    currentClaudeProcess = claude;
+
     // Write prompt to stdin and close it
     claude.stdin.write(prompt);
     claude.stdin.end();
 
     claude.on("close", (code) => {
+      currentClaudeProcess = null;
       const exitCode = code ?? 0;
       console.log(`\n✅ Claude session ended (exit code: ${exitCode})`);
       resolve({ exitCode, output: "" });
     });
 
     claude.on("error", (err) => {
+      currentClaudeProcess = null;
       console.error(`\n❌ Error starting Claude: ${err.message}`);
       resolve({ exitCode: 1, output: "" });
     });
@@ -417,6 +466,10 @@ EXAMPLES
   .action(async (options: AutopilotOptions) => {
     const cwd = process.cwd();
 
+    // Set up interrupt handling for graceful Ctrl+C
+    currentCwd = cwd;
+    setupInterruptHandler();
+
     // Parse numeric options
     const maxIterations =
       typeof options.maxIterations === "string"
@@ -463,6 +516,9 @@ EXAMPLES
       sessions: [],
       status: "running",
     };
+
+    // Track state for interrupt handler
+    currentState = state;
 
     // Main loop
     let iteration = state.iterations;
