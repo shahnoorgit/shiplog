@@ -12,6 +12,7 @@ let isInterrupted = false;
 interface AutopilotOptions {
   maxIterations: number;
   stallThreshold: number;
+  timeout: number; // Session timeout in seconds
   dryRun: boolean;
 }
 
@@ -24,7 +25,8 @@ interface SessionLog {
   endCommits?: number;
   commitsMade?: number;
   exitCode?: number;
-  status: "running" | "completed" | "stalled" | "error";
+  timedOut?: boolean;
+  status: "running" | "completed" | "stalled" | "error" | "timeout";
 }
 
 interface AutopilotState {
@@ -235,22 +237,26 @@ function runClaudeSession(
   cwd: string,
   prompt: string,
   options: AutopilotOptions
-): Promise<{ exitCode: number; output: string }> {
+): Promise<{ exitCode: number; output: string; timedOut: boolean }> {
   if (options.dryRun) {
     console.log("\n📝 Would run claude with prompt:\n");
     console.log("---");
     console.log(prompt.slice(0, 500) + (prompt.length > 500 ? "..." : ""));
     console.log("---\n");
-    return Promise.resolve({ exitCode: 0, output: "(dry run)" });
+    return Promise.resolve({ exitCode: 0, output: "(dry run)", timedOut: false });
   }
 
-  console.log("\n🚀 Starting Claude session...\n");
+  const timeoutSeconds = options.timeout;
+  console.log(`\n🚀 Starting Claude session (timeout: ${Math.floor(timeoutSeconds / 60)}m)...\n`);
 
   // Save prompt for reference
   const promptPath = path.join(cwd, ".shiplog/current-prompt.md");
   fs.writeFileSync(promptPath, prompt);
 
   return new Promise((resolve) => {
+    let timedOut = false;
+    let timeoutHandle: NodeJS.Timeout | null = null;
+
     // Use async spawn for real-time streaming to terminal
     // Key insight from Agent SDK: real-time output requires async event-based approach
     const claude = spawn("claude", ["--print"], {
@@ -262,21 +268,39 @@ function runClaudeSession(
     // Track process for interrupt handling
     currentClaudeProcess = claude;
 
+    // Set up timeout
+    if (timeoutSeconds > 0) {
+      timeoutHandle = setTimeout(() => {
+        timedOut = true;
+        console.log(`\n\n⏱️  Session timeout (${Math.floor(timeoutSeconds / 60)}m) - killing Claude process...`);
+        if (!claude.killed) {
+          claude.kill("SIGTERM");
+        }
+      }, timeoutSeconds * 1000);
+    }
+
     // Write prompt to stdin and close it
     claude.stdin.write(prompt);
     claude.stdin.end();
 
     claude.on("close", (code) => {
       currentClaudeProcess = null;
+      if (timeoutHandle) clearTimeout(timeoutHandle);
+
       const exitCode = code ?? 0;
-      console.log(`\n✅ Claude session ended (exit code: ${exitCode})`);
-      resolve({ exitCode, output: "" });
+      if (timedOut) {
+        console.log(`\n⏱️  Claude session timed out (exit code: ${exitCode})`);
+      } else {
+        console.log(`\n✅ Claude session ended (exit code: ${exitCode})`);
+      }
+      resolve({ exitCode, output: "", timedOut });
     });
 
     claude.on("error", (err) => {
       currentClaudeProcess = null;
+      if (timeoutHandle) clearTimeout(timeoutHandle);
       console.error(`\n❌ Error starting Claude: ${err.message}`);
-      resolve({ exitCode: 1, output: "" });
+      resolve({ exitCode: 1, output: "", timedOut: false });
     });
   });
 }
@@ -459,6 +483,11 @@ EXAMPLES
     "3"
   )
   .option(
+    "-t, --timeout <seconds>",
+    "Session timeout in seconds (default: 1800 = 30 minutes)",
+    "1800"
+  )
+  .option(
     "--dry-run",
     "Preview the prompt and settings without running Claude",
     false
@@ -479,6 +508,10 @@ EXAMPLES
       typeof options.stallThreshold === "string"
         ? parseInt(options.stallThreshold, 10)
         : options.stallThreshold;
+    const timeout =
+      typeof options.timeout === "string"
+        ? parseInt(options.timeout, 10)
+        : options.timeout;
 
     console.log("\n" + "=".repeat(60));
     console.log("  🚁 Shiplog Autopilot");
@@ -498,6 +531,7 @@ EXAMPLES
     console.log(`📌 Current task: ${sprintTask.task}`);
     console.log(`🔄 Max iterations: ${maxIterations}`);
     console.log(`⏸️  Stall threshold: ${stallThreshold} iterations`);
+    console.log(`⏱️  Session timeout: ${Math.floor(timeout / 60)} minutes`);
 
     if (options.dryRun) {
       console.log(`\n🧪 DRY RUN MODE - No actual execution\n`);
@@ -548,10 +582,11 @@ EXAMPLES
       const prompt = generateContinuationPrompt(cwd, iteration, sprintTask);
 
       // Run Claude session
-      const { exitCode } = await runClaudeSession(cwd, prompt, {
+      const { exitCode, timedOut } = await runClaudeSession(cwd, prompt, {
         ...options,
         maxIterations,
         stallThreshold,
+        timeout,
       });
 
       // Update session log
@@ -562,7 +597,8 @@ EXAMPLES
       sessionLog.endCommits = endCommits;
       sessionLog.commitsMade = commitsMade;
       sessionLog.exitCode = exitCode;
-      sessionLog.status = "completed";
+      sessionLog.timedOut = timedOut;
+      sessionLog.status = timedOut ? "timeout" : "completed";
 
       state.totalCommits += commitsMade;
 
