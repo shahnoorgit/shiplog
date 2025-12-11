@@ -210,28 +210,15 @@ function runClaudeSession(
 
     // Spawn claude with the prompt
     // Note: prompt is a positional argument, NOT a -p flag (-p means --print)
+    // Use stdio: "inherit" so output streams directly to terminal (no buffering issues)
     const claude = spawn("claude", ["--print", prompt], {
       cwd,
-      stdio: ["inherit", "pipe", "pipe"],
+      stdio: "inherit",
       env: { ...process.env },
     });
 
-    let output = "";
-
-    claude.stdout?.on("data", (data) => {
-      const text = data.toString();
-      output += text;
-      process.stdout.write(text);
-    });
-
-    claude.stderr?.on("data", (data) => {
-      const text = data.toString();
-      output += text;
-      process.stderr.write(text);
-    });
-
     claude.on("close", (code) => {
-      resolve({ exitCode: code ?? 0, output });
+      resolve({ exitCode: code ?? 0, output: "" });
     });
 
     claude.on("error", (err) => {
