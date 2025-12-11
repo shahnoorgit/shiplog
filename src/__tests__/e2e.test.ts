@@ -13,9 +13,17 @@ function createTempDir(): string {
 }
 
 // Helper to run shiplog commands
-function runShiplog(args: string, cwd: string): string {
+function runShiplog(args: string, cwd: string, allowFailure = false): string {
   const cliPath = path.join(__dirname, '../../dist/index.js');
-  return execSync(`node ${cliPath} ${args}`, { cwd, encoding: 'utf-8' });
+  try {
+    return execSync(`node ${cliPath} ${args}`, { cwd, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] });
+  } catch (e: any) {
+    if (allowFailure) {
+      // Return combined stdout + stderr for inspection
+      return (e.stdout?.toString() || '') + (e.stderr?.toString() || '');
+    }
+    throw e;
+  }
 }
 
 // Helper to read JSON file
@@ -419,5 +427,156 @@ describe('command files content', () => {
     expect(statusMd).toContain('/ship');
     // Should NOT recommend /ramp anymore
     expect(statusMd).not.toContain('Run /ramp');
+  });
+});
+
+describe('shiplog doctor', () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = createTempDir();
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('detects when shiplog is not initialized', () => {
+    // Empty directory
+    expect(() => runShiplog('doctor', tempDir)).toThrow();
+  });
+
+  it('passes on healthy installation', () => {
+    runShiplog('init', tempDir);
+
+    const output = runShiplog('doctor', tempDir);
+
+    expect(output).toContain('Shiplog installation detected');
+    expect(output).toContain('All');
+    expect(output).toContain('passed');
+  });
+
+  it('detects missing directories', () => {
+    // Create partial installation (missing hooks dir)
+    fs.mkdirSync(path.join(tempDir, '.claude/commands'), { recursive: true });
+    fs.mkdirSync(path.join(tempDir, 'docs'), { recursive: true });
+    fs.writeFileSync(path.join(tempDir, 'CLAUDE.md'), '# test');
+    fs.writeFileSync(path.join(tempDir, '.claude/commands/ship.md'), 'test');
+
+    const output = runShiplog('doctor', tempDir, true);
+
+    expect(output).toContain('Missing directory');
+    expect(output).toContain('.claude/hooks');
+  });
+
+  it('detects missing critical files', () => {
+    // Create minimal structure without ship.md
+    fs.mkdirSync(path.join(tempDir, '.claude/commands'), { recursive: true });
+    fs.mkdirSync(path.join(tempDir, '.claude/hooks'), { recursive: true });
+    fs.mkdirSync(path.join(tempDir, 'docs/sprints'), { recursive: true });
+    fs.writeFileSync(path.join(tempDir, 'CLAUDE.md'), '# test');
+    fs.writeFileSync(path.join(tempDir, 'docs/PROGRESS.md'), 'test');
+    fs.writeFileSync(path.join(tempDir, 'docs/HANDOFF.md'), 'test');
+
+    const output = runShiplog('doctor', tempDir, true);
+
+    expect(output).toContain('Missing file');
+    expect(output).toContain('ship.md');
+  });
+
+  it('detects v1 installation needing upgrade', () => {
+    // Create v1 structure (has ramp.md but no ship.md)
+    fs.mkdirSync(path.join(tempDir, '.claude/commands'), { recursive: true });
+    fs.mkdirSync(path.join(tempDir, '.claude/hooks'), { recursive: true });
+    fs.mkdirSync(path.join(tempDir, 'docs/sprints'), { recursive: true });
+    fs.writeFileSync(path.join(tempDir, 'CLAUDE.md'), '# test');
+    fs.writeFileSync(path.join(tempDir, 'docs/PROGRESS.md'), 'test');
+    fs.writeFileSync(path.join(tempDir, 'docs/HANDOFF.md'), 'test');
+    fs.writeFileSync(path.join(tempDir, '.claude/commands/ramp.md'), 'test');
+
+    const output = runShiplog('doctor', tempDir, true);
+
+    expect(output).toContain('v1');
+    expect(output).toContain('upgrade');
+  });
+
+  it('detects invalid hook format (object matcher)', () => {
+    runShiplog('init', tempDir);
+
+    // Corrupt the settings with old object matcher format
+    const settingsPath = path.join(tempDir, '.claude/settings.local.json');
+    const settings = readJson(settingsPath);
+    settings.hooks.SessionStart[0].matcher = {}; // Object instead of string
+    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+
+    const output = runShiplog('doctor', tempDir, true);
+
+    expect(output).toContain('matcher must be a string');
+  });
+
+  it('detects invalid hook format (missing matcher)', () => {
+    runShiplog('init', tempDir);
+
+    // Corrupt the settings with old flat format (missing matcher)
+    const settingsPath = path.join(tempDir, '.claude/settings.local.json');
+    fs.writeFileSync(settingsPath, JSON.stringify({
+      permissions: { allow: [], deny: [] },
+      hooks: {
+        SessionStart: [
+          { type: 'command', command: 'bash test.sh' }
+        ]
+      }
+    }, null, 2));
+
+    const output = runShiplog('doctor', tempDir, true);
+
+    expect(output).toContain("missing 'matcher' field");
+  });
+
+  it('fixes hook format with --fix', () => {
+    runShiplog('init', tempDir);
+
+    // Corrupt the settings with object matcher
+    const settingsPath = path.join(tempDir, '.claude/settings.local.json');
+    const settings = readJson(settingsPath);
+    settings.hooks.SessionStart[0].matcher = {}; // Object instead of string
+    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+
+    runShiplog('doctor --fix', tempDir, true);
+
+    // Check it was fixed
+    const fixedSettings = readJson(settingsPath);
+    expect(typeof fixedSettings.hooks.SessionStart[0].matcher).toBe('string');
+  });
+
+  it('fixes non-executable hook scripts with --fix', () => {
+    runShiplog('init', tempDir);
+
+    // Remove executable bit from hook script
+    const hookPath = path.join(tempDir, '.claude/hooks/session-start.sh');
+    fs.chmodSync(hookPath, 0o644);
+
+    // Verify it's not executable
+    expect(fs.statSync(hookPath).mode & 0o111).toBe(0);
+
+    runShiplog('doctor --fix', tempDir, true);
+
+    // Check it was fixed
+    expect(fs.statSync(hookPath).mode & 0o111).toBeGreaterThan(0);
+  });
+
+  it('creates missing directories with --fix', () => {
+    // Create partial installation
+    fs.mkdirSync(path.join(tempDir, '.claude/commands'), { recursive: true });
+    fs.mkdirSync(path.join(tempDir, 'docs'), { recursive: true });
+    fs.writeFileSync(path.join(tempDir, 'CLAUDE.md'), '# test');
+    fs.writeFileSync(path.join(tempDir, '.claude/commands/ship.md'), 'test');
+    // Missing: .claude/hooks and docs/sprints
+
+    runShiplog('doctor --fix', tempDir, true);
+
+    // Directories should now exist
+    expect(fs.existsSync(path.join(tempDir, '.claude/hooks'))).toBe(true);
+    expect(fs.existsSync(path.join(tempDir, 'docs/sprints'))).toBe(true);
   });
 });
