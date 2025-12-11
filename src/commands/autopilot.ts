@@ -206,22 +206,30 @@ function runClaudeSession(
   const promptPath = path.join(cwd, ".shiplog/current-prompt.md");
   fs.writeFileSync(promptPath, prompt);
 
-  // Use spawnSync with stdin pipe (like ACE framework does with subprocess.run)
-  // Pass prompt via stdin, let stdout/stderr go directly to terminal
-  const { spawnSync } = require("child_process");
+  return new Promise((resolve) => {
+    // Use async spawn for real-time streaming to terminal
+    // Key insight from Agent SDK: real-time output requires async event-based approach
+    const claude = spawn("claude", ["--print"], {
+      cwd,
+      stdio: ["pipe", "inherit", "inherit"],  // stdin=pipe, stdout/stderr=terminal
+      env: { ...process.env },
+    });
 
-  const result = spawnSync("claude", ["--print"], {
-    cwd,
-    input: prompt,         // Pass prompt via stdin (like ACE's input=prompt)
-    encoding: "utf-8",
-    stdio: ["pipe", "inherit", "inherit"],  // stdin=pipe, stdout/stderr=terminal
-    env: { ...process.env },
-    maxBuffer: 50 * 1024 * 1024,  // 50MB buffer
+    // Write prompt to stdin and close it
+    claude.stdin.write(prompt);
+    claude.stdin.end();
+
+    claude.on("close", (code) => {
+      const exitCode = code ?? 0;
+      console.log(`\n✅ Claude session ended (exit code: ${exitCode})`);
+      resolve({ exitCode, output: "" });
+    });
+
+    claude.on("error", (err) => {
+      console.error(`\n❌ Error starting Claude: ${err.message}`);
+      resolve({ exitCode: 1, output: "" });
+    });
   });
-
-  const exitCode = result.status ?? 0;
-  console.log(`\n✅ Claude session ended (exit code: ${exitCode})`);
-  return Promise.resolve({ exitCode, output: "" });
 }
 
 function extractLearnings(
