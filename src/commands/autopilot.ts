@@ -13,6 +13,7 @@ interface AutopilotOptions {
   maxIterations: number;
   stallThreshold: number;
   timeout: number; // Session timeout in seconds
+  maxRetries: number; // Max retries per session on failure
   dryRun: boolean;
 }
 
@@ -28,6 +29,7 @@ interface SessionLog {
   sprintUpdated?: boolean;
   exitCode?: number;
   timedOut?: boolean;
+  retriesUsed?: number;
   status: "running" | "completed" | "stalled" | "error" | "timeout";
 }
 
@@ -520,6 +522,11 @@ EXAMPLES
     "1800"
   )
   .option(
+    "-r, --max-retries <n>",
+    "Max retries per session on failure (default: 2)",
+    "2"
+  )
+  .option(
     "--dry-run",
     "Preview the prompt and settings without running Claude",
     false
@@ -544,6 +551,10 @@ EXAMPLES
       typeof options.timeout === "string"
         ? parseInt(options.timeout, 10)
         : options.timeout;
+    const maxRetries =
+      typeof options.maxRetries === "string"
+        ? parseInt(options.maxRetries, 10)
+        : options.maxRetries;
 
     console.log("\n" + "=".repeat(60));
     console.log("  🚁 Shiplog Autopilot");
@@ -613,13 +624,43 @@ EXAMPLES
       // Generate prompt with learnings
       const prompt = generateContinuationPrompt(cwd, iteration, sprintTask);
 
-      // Run Claude session
-      const { exitCode, timedOut } = await runClaudeSession(cwd, prompt, {
-        ...options,
-        maxIterations,
-        stallThreshold,
-        timeout,
-      });
+      // Run Claude session with retry logic
+      let exitCode = 0;
+      let timedOut = false;
+      let retriesUsed = 0;
+
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        if (attempt > 0) {
+          // Exponential backoff: 5s, 10s, 20s, etc.
+          const backoffSeconds = 5 * Math.pow(2, attempt - 1);
+          console.log(`\n🔄 Retry ${attempt}/${maxRetries} in ${backoffSeconds}s...`);
+          await new Promise((resolve) => setTimeout(resolve, backoffSeconds * 1000));
+        }
+
+        const result = await runClaudeSession(cwd, prompt, {
+          ...options,
+          maxIterations,
+          stallThreshold,
+          timeout,
+          maxRetries,
+        });
+
+        exitCode = result.exitCode;
+        timedOut = result.timedOut;
+
+        // Success or timeout (don't retry timeouts)
+        if (exitCode === 0 || timedOut) {
+          break;
+        }
+
+        // Non-zero exit code - will retry if attempts remain
+        retriesUsed = attempt + 1;
+        if (attempt < maxRetries) {
+          console.log(`\n⚠️  Claude exited with code ${exitCode}, will retry...`);
+        } else {
+          console.log(`\n❌ Claude failed after ${maxRetries + 1} attempts (exit code: ${exitCode})`);
+        }
+      }
 
       // Update session log
       const endCommits = getCommitCount(cwd);
@@ -635,13 +676,17 @@ EXAMPLES
       sessionLog.sprintUpdated = sprintFileModified;
       sessionLog.exitCode = exitCode;
       sessionLog.timedOut = timedOut;
-      sessionLog.status = timedOut ? "timeout" : "completed";
+      sessionLog.retriesUsed = retriesUsed;
+      sessionLog.status = timedOut ? "timeout" : (exitCode !== 0 ? "error" : "completed");
 
       state.totalCommits += commitsMade;
 
       console.log(`\n📊 Session ${iteration} Results:`);
       console.log(`   Commits made: ${commitsMade}`);
       console.log(`   Files changed: ${changedFiles}${sprintFileModified ? " (sprint updated)" : ""}`);
+      if (retriesUsed > 0) {
+        console.log(`   Retries used: ${retriesUsed}/${maxRetries}`);
+      }
       console.log(`   Total commits: ${state.totalCommits}`);
 
       // Extract learnings
