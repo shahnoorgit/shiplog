@@ -21,7 +21,7 @@
         "Kill Claude process if exceeds timeout",
         "Record timeout in session log"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "robust-003",
