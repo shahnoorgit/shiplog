@@ -208,22 +208,23 @@ function runClaudeSession(
     const promptPath = path.join(cwd, ".shiplog/current-prompt.md");
     fs.writeFileSync(promptPath, prompt);
 
-    // Spawn claude with prompt via stdin (avoids command-line length/escaping issues)
-    const claude = spawn("claude", ["--print"], {
+    // Use shell to pipe the prompt file to claude --print
+    // This is more reliable than spawn with stdin pipe
+    const shellCmd = `cat "${promptPath}" | claude --print`;
+    console.log(`📝 Prompt length: ${prompt.length} chars`);
+
+    const shell = spawn("sh", ["-c", shellCmd], {
       cwd,
-      stdio: ["pipe", "inherit", "inherit"],
+      stdio: "inherit", // All streams inherit from parent (terminal)
       env: { ...process.env },
     });
 
-    // Write prompt to stdin and close it
-    claude.stdin?.write(prompt);
-    claude.stdin?.end();
-
-    claude.on("close", (code) => {
+    shell.on("close", (code) => {
+      console.log(`\n✅ Claude session ended (exit code: ${code})`);
       resolve({ exitCode: code ?? 0, output: "" });
     });
 
-    claude.on("error", (err) => {
+    shell.on("error", (err) => {
       console.error(`\n❌ Failed to start claude: ${err.message}\n`);
       resolve({ exitCode: 1, output: err.message });
     });

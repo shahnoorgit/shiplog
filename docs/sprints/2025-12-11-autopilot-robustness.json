@@ -1,0 +1,67 @@
+{
+  "initiative": "Improve Autopilot Robustness",
+  "created": "2025-12-11",
+  "status": "in_progress",
+  "features": [
+    {
+      "id": "robust-001",
+      "description": "Add graceful interrupt handling (Ctrl+C saves state and exits cleanly)",
+      "steps": [
+        "Add SIGINT handler that saves state",
+        "Mark current session as interrupted",
+        "Exit with appropriate code"
+      ],
+      "passes": false
+    },
+    {
+      "id": "robust-002",
+      "description": "Add session timeout with configurable duration",
+      "steps": [
+        "Add --timeout option",
+        "Kill Claude process if exceeds timeout",
+        "Record timeout in session log"
+      ],
+      "passes": false
+    },
+    {
+      "id": "robust-003",
+      "description": "Improve progress detection beyond just commits",
+      "steps": [
+        "Track file changes via git diff",
+        "Track sprint file updates",
+        "Consider file changes as soft progress"
+      ],
+      "passes": false
+    },
+    {
+      "id": "robust-004",
+      "description": "Add retry logic for failed Claude sessions",
+      "steps": [
+        "Detect non-zero exit codes",
+        "Retry up to N times with backoff",
+        "Record failures in state"
+      ],
+      "passes": false
+    },
+    {
+      "id": "robust-005",
+      "description": "Run Claude interactively instead of print mode for true autonomy",
+      "steps": [
+        "Use PTY to run Claude interactively",
+        "Pass prompt via stdin/file",
+        "Capture output for logging"
+      ],
+      "passes": false
+    },
+    {
+      "id": "robust-006",
+      "description": "Add --resume flag to continue interrupted autopilot runs",
+      "steps": [
+        "Check for existing state on startup",
+        "Offer to resume or start fresh",
+        "Continue from last session"
+      ],
+      "passes": false
+    }
+  ]
+}
