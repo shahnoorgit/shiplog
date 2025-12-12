@@ -253,6 +253,19 @@ function getCurrentSprint(cwd: string): Sprint | null {
   return null;
 }
 
+// Read a specific sprint file by path (regardless of status)
+// Used for re-reading sprint after session to check for newly completed features
+function getSprintByPath(cwd: string, sprintFilePath: string): Sprint | null {
+  const fullPath = path.join(cwd, sprintFilePath);
+  if (!fs.existsSync(fullPath)) return null;
+
+  try {
+    return JSON.parse(fs.readFileSync(fullPath, "utf-8")) as Sprint;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Check if a feature was marked complete (passes: true) since start of iteration
  * by comparing what was incomplete before vs after
@@ -1523,7 +1536,10 @@ EXAMPLES
       console.log("-".repeat(60));
 
       // Track incomplete features BEFORE session (for review detection)
-      const sprintBefore = getCurrentSprint(cwd);
+      // IMPORTANT: Track the sprint file path so we can re-read it after session
+      // even if the crew marks it as "completed" (which would make getCurrentSprint return null)
+      const sprintFilePath = getCurrentSprintFile(cwd);
+      const sprintBefore = sprintFilePath ? getSprintByPath(cwd, sprintFilePath) : null;
       const incompleteFeaturesBeforeSession = sprintBefore?.features
         ?.filter(f => !f.passes)
         .map(f => f.description) || [];
@@ -1713,7 +1729,8 @@ EXAMPLES
       console.log(`📝 Sprint memory updated (iteration ${iteration})`);
 
       // REVIEW PHASE: Check if any features were newly marked complete
-      const sprintAfter = getCurrentSprint(cwd);
+      // Re-read the SAME sprint file we tracked before (even if status changed to "completed")
+      const sprintAfter = sprintFilePath ? getSprintByPath(cwd, sprintFilePath) : null;
       const newlyCompletedFeatures = getNewlyCompletedFeatures(
         incompleteFeaturesBeforeSession,
         sprintAfter
