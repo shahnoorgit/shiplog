@@ -68,7 +68,7 @@ describe('shiplog init', () => {
     expect(fs.existsSync(path.join(tempDir, '.claude/hooks/session-end.sh'))).toBe(true);
 
     // Check settings exist
-    expect(fs.existsSync(path.join(tempDir, '.claude/settings.local.json'))).toBe(true);
+    expect(fs.existsSync(path.join(tempDir, '.claude/settings.json'))).toBe(true);
   });
 
   it('uses correct project name in files', () => {
@@ -121,7 +121,7 @@ describe('shiplog init', () => {
     // Create settings with mcpServers
     fs.mkdirSync(path.join(tempDir, '.claude'), { recursive: true });
     fs.writeFileSync(
-      path.join(tempDir, '.claude/settings.local.json'),
+      path.join(tempDir, '.claude/settings.json'),
       JSON.stringify({
         mcpServers: {
           myServer: { command: 'node', args: ['server.js'] }
@@ -132,7 +132,7 @@ describe('shiplog init', () => {
 
     runShiplog('init --force', tempDir);
 
-    const settings = readJson(path.join(tempDir, '.claude/settings.local.json'));
+    const settings = readJson(path.join(tempDir, '.claude/settings.json'));
     expect(settings.mcpServers).toBeDefined();
     expect(settings.mcpServers.myServer).toBeDefined();
     expect(settings.mcpServers.myServer.command).toBe('node');
@@ -161,7 +161,7 @@ describe('shiplog upgrade', () => {
     fs.mkdirSync(path.join(tempDir, 'docs'), { recursive: true });
     fs.writeFileSync(path.join(tempDir, 'CLAUDE.md'), '# test-project');
     fs.writeFileSync(path.join(tempDir, '.claude/commands/ramp.md'), 'old ramp content');
-    fs.writeFileSync(path.join(tempDir, '.claude/settings.local.json'), '{}');
+    fs.writeFileSync(path.join(tempDir, '.claude/settings.json'), '{}');
 
     runShiplog('upgrade', tempDir);
 
@@ -178,7 +178,7 @@ describe('shiplog upgrade', () => {
     fs.mkdirSync(path.join(tempDir, 'docs'), { recursive: true });
     fs.writeFileSync(path.join(tempDir, 'CLAUDE.md'), '# test-project');
     fs.writeFileSync(path.join(tempDir, '.claude/commands/ramp.md'), 'original ramp content');
-    fs.writeFileSync(path.join(tempDir, '.claude/settings.local.json'), '{}');
+    fs.writeFileSync(path.join(tempDir, '.claude/settings.json'), '{}');
 
     runShiplog('upgrade', tempDir);
 
@@ -201,7 +201,7 @@ describe('shiplog upgrade', () => {
     fs.mkdirSync(path.join(tempDir, 'docs'), { recursive: true });
     fs.writeFileSync(path.join(tempDir, 'CLAUDE.md'), '# test-project');
     fs.writeFileSync(
-      path.join(tempDir, '.claude/settings.local.json'),
+      path.join(tempDir, '.claude/settings.json'),
       JSON.stringify({
         mcpServers: {
           context7: { command: 'npx', args: ['-y', '@context7/mcp'] }
@@ -211,7 +211,7 @@ describe('shiplog upgrade', () => {
 
     runShiplog('upgrade', tempDir);
 
-    const settings = readJson(path.join(tempDir, '.claude/settings.local.json'));
+    const settings = readJson(path.join(tempDir, '.claude/settings.json'));
     expect(settings.mcpServers).toBeDefined();
     expect(settings.mcpServers.context7).toBeDefined();
     expect(settings.hooks).toBeDefined();
@@ -223,7 +223,7 @@ describe('shiplog upgrade', () => {
     fs.mkdirSync(path.join(tempDir, 'docs'), { recursive: true });
     fs.writeFileSync(path.join(tempDir, 'CLAUDE.md'), '# test-project');
     fs.writeFileSync(path.join(tempDir, '.claude/commands/ship.md'), 'existing ship content');
-    fs.writeFileSync(path.join(tempDir, '.claude/settings.local.json'), '{}');
+    fs.writeFileSync(path.join(tempDir, '.claude/settings.json'), '{}');
 
     const output = runShiplog('upgrade', tempDir);
 
@@ -236,7 +236,7 @@ describe('shiplog upgrade', () => {
     fs.mkdirSync(path.join(tempDir, 'docs'), { recursive: true });
     fs.writeFileSync(path.join(tempDir, 'CLAUDE.md'), '# test-project');
     fs.writeFileSync(path.join(tempDir, '.claude/commands/ship.md'), 'old ship content');
-    fs.writeFileSync(path.join(tempDir, '.claude/settings.local.json'), '{}');
+    fs.writeFileSync(path.join(tempDir, '.claude/settings.json'), '{}');
 
     runShiplog('upgrade --force', tempDir);
 
@@ -246,7 +246,7 @@ describe('shiplog upgrade', () => {
   });
 });
 
-describe('settings.local.json format', () => {
+describe('settings.json format', () => {
   let tempDir: string;
 
   beforeEach(() => {
@@ -260,14 +260,14 @@ describe('settings.local.json format', () => {
   it('generates valid JSON', () => {
     runShiplog('init', tempDir);
 
-    const settingsPath = path.join(tempDir, '.claude/settings.local.json');
+    const settingsPath = path.join(tempDir, '.claude/settings.json');
     expect(() => readJson(settingsPath)).not.toThrow();
   });
 
   it('has correct hook format with matchers', () => {
     runShiplog('init', tempDir);
 
-    const settings = readJson(path.join(tempDir, '.claude/settings.local.json'));
+    const settings = readJson(path.join(tempDir, '.claude/settings.json'));
 
     // Check hooks structure
     expect(settings.hooks).toBeDefined();
@@ -297,7 +297,7 @@ describe('settings.local.json format', () => {
   it('has permissions structure', () => {
     runShiplog('init', tempDir);
 
-    const settings = readJson(path.join(tempDir, '.claude/settings.local.json'));
+    const settings = readJson(path.join(tempDir, '.claude/settings.json'));
 
     expect(settings.permissions).toBeDefined();
     expect(settings.permissions.allow).toBeDefined();
@@ -672,7 +672,7 @@ describe('shiplog doctor', () => {
     runShiplog('init', tempDir);
 
     // Corrupt the settings with old object matcher format
-    const settingsPath = path.join(tempDir, '.claude/settings.local.json');
+    const settingsPath = path.join(tempDir, '.claude/settings.json');
     const settings = readJson(settingsPath);
     settings.hooks.SessionStart[0].matcher = {}; // Object instead of string
     fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
@@ -686,7 +686,7 @@ describe('shiplog doctor', () => {
     runShiplog('init', tempDir);
 
     // Corrupt the settings with old flat format (missing matcher)
-    const settingsPath = path.join(tempDir, '.claude/settings.local.json');
+    const settingsPath = path.join(tempDir, '.claude/settings.json');
     fs.writeFileSync(settingsPath, JSON.stringify({
       permissions: { allow: [], deny: [] },
       hooks: {
@@ -705,7 +705,7 @@ describe('shiplog doctor', () => {
     runShiplog('init', tempDir);
 
     // Corrupt the settings with object matcher
-    const settingsPath = path.join(tempDir, '.claude/settings.local.json');
+    const settingsPath = path.join(tempDir, '.claude/settings.json');
     const settings = readJson(settingsPath);
     settings.hooks.SessionStart[0].matcher = {}; // Object instead of string
     fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));

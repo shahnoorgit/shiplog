@@ -136,7 +136,7 @@ export const initCommand = new Command("init")
         skipIf: "noVoice",
       },
       {
-        path: ".claude/settings.local.json",
+        path: ".claude/settings.json",
         content: getSETTINGSjson(),
       },
     ];
@@ -169,8 +169,8 @@ export const initCommand = new Command("init")
         continue;
       }
 
-      // Special handling for settings.local.json - never overwrite user's config
-      if (file.path === ".claude/settings.local.json" && fs.existsSync(filePath)) {
+      // Special handling for settings.json - never overwrite user's config
+      if (file.path === ".claude/settings.json" && fs.existsSync(filePath)) {
         console.log(`  ⏭️  Skipped ${file.path} (preserving your existing config)`);
         skipped++;
         continue;
@@ -417,7 +417,7 @@ docs/FEATURES.json
 docs/CLAUDE_VOICE.md
 .claude/commands/ramp.md
 .claude/session-start.md
-.claude/settings.local.json
+.claude/settings.json
 \`\`\`
 `;
 }

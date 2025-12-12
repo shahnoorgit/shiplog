@@ -135,9 +135,9 @@ export const doctorCommand = new Command("doctor")
     console.log(`✓ Hook script permissions`);
 
     // ========================================
-    // Check 5: settings.local.json format
+    // Check 5: settings.json format
     // ========================================
-    const settingsPath = path.join(cwd, ".claude/settings.local.json");
+    const settingsPath = path.join(cwd, ".claude/settings.json");
     if (fs.existsSync(settingsPath)) {
       checksRun++;
       try {
@@ -224,7 +224,7 @@ export const doctorCommand = new Command("doctor")
       } catch (e) {
         issues.push({
           type: "error",
-          message: `settings.local.json is not valid JSON: ${e instanceof Error ? e.message : "unknown error"}`,
+          message: `settings.json is not valid JSON: ${e instanceof Error ? e.message : "unknown error"}`,
           fixDescription: `Manually fix JSON syntax or run 'shiplog init --force'`,
         });
       }
@@ -232,7 +232,7 @@ export const doctorCommand = new Command("doctor")
       checksRun++;
       issues.push({
         type: "warning",
-        message: `Missing .claude/settings.local.json`,
+        message: `Missing .claude/settings.json`,
         fixDescription: `Run 'shiplog init' to create it`,
       });
     }

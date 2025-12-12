@@ -159,8 +159,8 @@ export const upgradeCommand = new Command("upgrade")
       }
     }
 
-    // Update settings.local.json to include hooks (preserve existing config!)
-    const settingsPath = path.join(claudeDir, "settings.local.json");
+    // Update settings.json to include hooks (preserve existing config!)
+    const settingsPath = path.join(claudeDir, "settings.json");
     let settingsUpdated = false;
 
     if (fs.existsSync(settingsPath)) {
@@ -194,18 +194,18 @@ export const upgradeCommand = new Command("upgrade")
             ]
           };
           fs.writeFileSync(settingsPath, JSON.stringify(existingSettings, null, 2) + "\n");
-          console.log(`  🔄 Updated .claude/settings.local.json (added hooks, preserved mcpServers)`);
+          console.log(`  🔄 Updated .claude/settings.json (added hooks, preserved mcpServers)`);
           settingsUpdated = true;
         }
       } catch (e) {
         // If parsing fails, DON'T overwrite - user may have mcpServers or other config
-        console.log(`  ⚠️  Could not parse .claude/settings.local.json`);
+        console.log(`  ⚠️  Could not parse .claude/settings.json`);
         console.log(`     Hooks not added. Please manually add hooks config.`);
         console.log(`     (Your mcpServers and other settings were preserved)`);
       }
     } else {
       fs.writeFileSync(settingsPath, getSETTINGSjson());
-      console.log(`  ✅ Added .claude/settings.local.json`);
+      console.log(`  ✅ Added .claude/settings.json`);
       added++;
     }
 
