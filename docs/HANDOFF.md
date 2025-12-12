@@ -3,81 +3,72 @@
 > Capture current session state so the next session can pick up seamlessly.
 
 **Last Updated:** 2025-12-11
-**Status:** Ready for Agent SDK upgrade!
+**Status:** Agent SDK Upgrade Complete!
 
 ---
 
 ## What Was Done This Session
 
-### Fixed Real-Time Streaming Output (v1.2.1)
-The autopilot command now shows Claude's output in real-time. We solved the CLI streaming problem by using `--output-format stream-json --include-partial-messages --verbose` and parsing `content_block_delta` events.
+### Completed Agent SDK Upgrade Sprint (8/8 features)
 
-### Created Agent SDK Upgrade Sprint
-After fixing streaming, we discovered that the Anthropic Agent SDK would eliminate ALL the CLI gymnastics we just solved. Created comprehensive sprint: `docs/sprints/2025-12-11-agent-sdk-upgrade.json`
+Migrated autopilot from CLI spawning to native Anthropic Agent SDK:
 
-**Why upgrade?** The SDK provides:
-- Native streaming (no JSON parsing)
-- Built-in session management (no state files)
-- Permission callbacks (canUseTool)
-- Budget controls
-- TypeScript-native API
+1. **SDK Installation** - Added @anthropic-ai/claude-agent-sdk v0.1.65
+2. **CLI Replacement** - Replaced spawn('claude') with SDK query() API
+3. **Session Resume** - Store session ID in state.currentSessionId for resume
+4. **Permission Handling** - Using permissionMode: 'acceptEdits' for autonomous operation
+5. **System Prompt** - Using systemPrompt with preset: 'claude_code' + append
+6. **Streaming Output** - Handling assistant, tool_progress, result message types
+7. **Budget Controls** - Added --max-budget option and cost/token tracking
+8. **Code Cleanup** - Removed all spawn/stream-json code, using AbortController
 
-**Recommendation:** Use V2 Preview API (`unstable_v2_*`) - dramatically simpler send()/receive() pattern.
+**Benefits:**
+- Native TypeScript SDK vs fragile CLI parsing
+- Built-in cost tracking ($X.XXXX per session)
+- Session resume between iterations
+- AbortController for clean Ctrl+C handling
+- ~100 lines of stream parsing code removed
 
 ---
 
 ## Current State
 
-- **Version:** 1.2.1
+- **Version:** Ready for 1.3.0
 - **Git:** All changes committed
-- **Active Sprint:** 2025-12-11-agent-sdk-upgrade (8 features)
-- **Tests:** E2E tests pass (23 tests)
+- **Sprint:** 2025-12-11-agent-sdk-upgrade (COMPLETED - 8/8 features)
+- **Tests:** 42 tests pass
 
 ---
 
 ## What's Next
 
-**Run autopilot to upgrade itself to the Agent SDK!**
-
-```bash
-shiplog autopilot --fresh
-```
-
-The sprint has 8 features:
-1. Install Agent SDK and set up basic V2 session
-2. Replace CLI spawn with SDK session
-3. Implement native session resume
-4. Add permission handling (canUseTool)
-5. Configure system prompt with CLAUDE.md
-6. Handle streaming output types properly
-7. Add budget controls and cost tracking
-8. Clean up legacy CLI code
+1. **Bump version to 1.3.0** and publish to npm
+2. **Test autopilot with SDK** - run `shiplog autopilot --dry-run` to verify
+3. **Consider new features:**
+   - Model selection option (--model)
+   - MCP server integration
+   - Better tool progress display
 
 ---
 
-## Key Context for Agent SDK Migration
+## Key Changes to Know
 
-### V2 API Pattern (recommended)
-```typescript
-import { unstable_v2_createSession } from '@anthropic-ai/claude-agent-sdk'
-
-await using session = unstable_v2_createSession({ model: 'claude-sonnet-4-5-20250929' })
-await session.send('Hello!')
-for await (const msg of session.receive()) {
-  if (msg.type === 'assistant') {
-    // Handle response
-  }
-}
+### New Command Options
+```bash
+shiplog autopilot --max-budget 5.0  # Limit cost per session (default: $5)
 ```
 
-### Key Docs
-- V2 Preview: https://platform.claude.com/docs/en/agent-sdk/typescript-v2-preview
-- V1 (full features): https://platform.claude.com/docs/en/agent-sdk/typescript
-- Permissions: https://platform.claude.com/docs/en/agent-sdk/permissions
+### Cost Tracking
+Sessions now show cost and token usage:
+```
+📊 Session 1 Results:
+   Commits made: 3
+   Cost: $0.0185
+   Tokens: 1,234 in / 567 out
+```
 
-### What V2 is missing (not needed for autopilot)
-- Session forking (forkSession option)
-- Some advanced streaming input patterns
+### Session Resume
+The SDK can resume sessions between iterations using stored session IDs.
 
 ---
 
@@ -85,4 +76,4 @@ for await (const msg of session.receive()) {
 
 - npm: https://www.npmjs.com/package/shiplog
 - GitHub: https://github.com/danielgwilson/shiplog
-- Agent SDK: https://platform.claude.com/docs/en/agent-sdk
+- Agent SDK: https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk

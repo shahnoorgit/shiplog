@@ -28,6 +28,7 @@
 | **Autopilot Mode** | 2025-12-11 | v1.2.0 - outer loop for truly autonomous sessions (ACE-inspired) |
 | **Autopilot Robustness** | 2025-12-11 | Graceful Ctrl+C, timeout, progress detection, retry logic, resume |
 | **Streaming Output** | 2025-12-11 | v1.2.1 - Real-time streaming via stream-json format |
+| **Agent SDK Upgrade** | 2025-12-11 | v1.3.0 - Native SDK instead of CLI spawning, cost tracking |
 
 ---
 
@@ -35,7 +36,6 @@
 
 | Task | Started | Notes |
 |------|---------|-------|
-| **Agent SDK Upgrade** | 2025-12-11 | Replace CLI spawning with native SDK - 8 features in sprint |
 
 ---
 
@@ -64,4 +64,5 @@
 - v1.1.4: Doctor command for health validation
 - v1.2.0: Autopilot mode - outer loop for autonomous sessions (ACE-inspired)
 - v1.2.1: Real-time streaming output - see Claude's thinking as it happens
+- v1.3.0: Agent SDK upgrade - native SDK instead of CLI spawning, cost tracking
 - Repo is now PUBLIC
