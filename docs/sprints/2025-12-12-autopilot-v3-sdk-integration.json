@@ -26,7 +26,8 @@
         "Add agents to sdkOptions in runClaudeSession",
         "Test that Task tool invocations work in autopilot"
       ],
-      "passes": false
+      "passes": true,
+      "notes": "Added BUILTIN_AGENTS constant and passed to SDK options. Includes system prompt hints about available subagents."
     },
     {
       "id": "v3-002",

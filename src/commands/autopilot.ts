@@ -1075,6 +1075,8 @@ async function runClaudeSession(
     abortController,
     // Built-in agents for Task tool - enables background tasks like Claude Code
     agents: BUILTIN_AGENTS,
+    // Enable real-time text streaming (partial messages as they arrive)
+    includePartialMessages: true,
     // Resume from previous session if provided
     ...(resumeSessionId && { resume: resumeSessionId }),
   };
@@ -1096,13 +1098,24 @@ async function runClaudeSession(
         console.log(`🔗 Session: ${sessionId?.slice(0, 8)}...`);
       }
 
-      // Handle assistant messages - stream text to stdout
+      // Handle real-time streaming via partial messages
+      if (msg.type === "stream_event") {
+        const event = msg.event;
+        // Extract text deltas from content_block_delta events
+        if (event.type === "content_block_delta") {
+          const delta = event.delta;
+          if (delta.type === "text_delta" && delta.text) {
+            process.stdout.write(delta.text);
+          }
+        }
+      }
+
+      // Handle completed assistant messages - only for tool_use blocks
+      // (text is already streamed via stream_event above)
       if (msg.type === "assistant") {
         const content = msg.message.content;
         for (const block of content) {
-          if (block.type === "text") {
-            process.stdout.write(block.text);
-          } else if (block.type === "tool_use") {
+          if (block.type === "tool_use") {
             console.log(`\n${formatToolUse(block.name, block.input)}`);
           }
         }
