@@ -1,0 +1,23 @@
+{
+  "initiative": "Test SDK Integration",
+  "created": "2025-12-11",
+  "status": "in_progress",
+  "context": {
+    "why": "Verify the new Agent SDK-based autopilot works correctly before publishing v1.3.0",
+    "scope": "Minimal test - create a file, verify it exists, clean up"
+  },
+  "features": [
+    {
+      "id": "test-001",
+      "description": "Create a test file, verify SDK streaming and cost tracking work",
+      "steps": [
+        "Create a file at scripts/sdk-verification.txt with a timestamp",
+        "Log that the SDK integration is working",
+        "Delete the test file",
+        "Mark this feature as passes: true"
+      ],
+      "passes": false,
+      "notes": "Simple smoke test to verify SDK query() streaming works"
+    }
+  ]
+}

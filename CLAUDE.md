@@ -2,6 +2,13 @@
 
 > Project instructions for Claude Code. This file is automatically loaded at the start of each session.
 
+## Terminology (Pirate Edition 🏴‍☠️)
+
+- **Captain** = The planning/architect agent (sets the course)
+- **Crew** = The implementing agent (does the work)
+- **Navigator** = Explore/research sub-agents
+- **Quartermaster** = Budget tracking features
+
 ## Commands
 
 **IMPORTANT: Use pnpm, not npm!**
