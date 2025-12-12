@@ -1,0 +1,48 @@
+{
+  "initiative": "Autopilot Quality of Life Improvements",
+  "created": "2025-12-11",
+  "status": "in_progress",
+  "context": {
+    "why": "Now that SDK integration works, add polish features to make autopilot more useful and informative",
+    "scope": "Small, focused improvements - each can be done in one session"
+  },
+  "features": [
+    {
+      "id": "qol-001",
+      "description": "Add --model flag to select Claude model (sonnet/opus/haiku)",
+      "steps": [
+        "Add -m/--model option to autopilot command (default: sonnet)",
+        "Map friendly names to model IDs (sonnet -> claude-sonnet-4-5-20250929, etc)",
+        "Pass selected model to SDK options",
+        "Show selected model in startup output",
+        "Update help text with available models"
+      ],
+      "passes": false,
+      "notes": "Lets users choose speed vs capability tradeoff"
+    },
+    {
+      "id": "qol-002",
+      "description": "Show file paths in tool output (not just tool names)",
+      "steps": [
+        "For Read/Write/Edit tools, extract file_path from input",
+        "Display as: 🔧 Read src/index.ts (not just 🔧 Read)",
+        "For Bash, show abbreviated command",
+        "Keep output concise - truncate long paths/commands"
+      ],
+      "passes": false,
+      "notes": "Makes it easier to follow what autopilot is doing"
+    },
+    {
+      "id": "qol-003",
+      "description": "Add session duration tracking",
+      "steps": [
+        "Record session start time",
+        "Calculate and display duration at session end",
+        "Add duration to SessionLog interface",
+        "Show in autopilot summary: Total time: Xm Ys"
+      ],
+      "passes": false,
+      "notes": "Useful for understanding how long things take"
+    }
+  ]
+}
