@@ -30,6 +30,8 @@
 | **Streaming Output** | 2025-12-11 | v1.2.1 - Real-time streaming via stream-json format |
 | **Agent SDK Upgrade** | 2025-12-11 | v1.3.0 - Native SDK instead of CLI spawning, cost tracking |
 | **Autopilot v2: Captain-Crew Loop** | 2025-12-11 | v1.5.0 - Quality-gated iterations with memory, loop detection, independent review |
+| **Reset command** | 2025-12-11 | `shiplog reset` to restart sprints fresh |
+| **Settings.json refactor** | 2025-12-11 | Use project-level settings.json (shared) instead of settings.local.json |
 
 ---
 
@@ -44,7 +46,7 @@
 
 | Task | Priority | Notes |
 |------|----------|-------|
-| Publish v1.5.0 | P1 | Captain-Crew loop ready |
+| ~~Publish v1.5.0~~ | ~~P1~~ | Ready to publish! |
 | Promote / share | P2 | Tweet, post, get feedback |
 
 ---
