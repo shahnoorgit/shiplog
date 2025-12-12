@@ -4,6 +4,7 @@
 
 ## What Works
 
+- Tests added/updated: "test: add SDK verification sprint + pirate terminology"
 - **Streaming JSON for real-time output**: Use `claude -p --verbose --output-format stream-json --include-partial-messages` to get chunked output instead of buffered
 - **Parsing stream events**: Look for `event.type === "stream_event"` then `event.event.type === "content_block_delta"` with `event.event.delta.text`
 - **Graceful interrupt handling**: SIGINT handler can save state before exit
@@ -25,4 +26,4 @@
 
 ---
 
-*Last updated: 2025-12-11*
+*Last updated: 2025-12-12T00:32:23.286Z*
