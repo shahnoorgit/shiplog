@@ -2,7 +2,7 @@ import { Command } from "commander";
 import * as fs from "fs";
 import * as path from "path";
 import { execSync } from "child_process";
-import { query, type Options, type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import { query, type Options } from "@anthropic-ai/claude-agent-sdk";
 
 // Module-level state for interrupt handling
 let currentAbortController: AbortController | null = null;
@@ -47,6 +47,8 @@ interface AutopilotState {
   totalCommits: number;
   stallCount: number;
   sessions: SessionLog[];
+  currentSessionId?: string; // SDK session ID for resume
+  totalCostUsd?: number; // Accumulated cost across all sessions
   status: "running" | "completed" | "stalled" | "interrupted";
 }
 
@@ -286,7 +288,8 @@ interface SessionResult {
 async function runClaudeSession(
   cwd: string,
   prompt: string,
-  options: AutopilotOptions
+  options: AutopilotOptions,
+  resumeSessionId?: string
 ): Promise<SessionResult> {
   if (options.dryRun) {
     console.log("\n📝 Would run claude with prompt:\n");
@@ -331,7 +334,13 @@ async function runClaudeSession(
       append: `\n\n# Autopilot Mode\nYou are running in autopilot mode. Work autonomously until the task is complete.\nMake commits frequently. Use /ship to check progress.`,
     },
     abortController,
+    // Resume from previous session if provided
+    ...(resumeSessionId && { resume: resumeSessionId }),
   };
+
+  if (resumeSessionId) {
+    console.log(`🔗 Resuming session: ${resumeSessionId.slice(0, 8)}...`);
+  }
 
   let sessionId: string | undefined;
   let costUsd: number | undefined;
@@ -782,13 +791,23 @@ EXAMPLES
           timeout,
           maxRetries,
           maxBudget,
-        });
+        }, state.currentSessionId);
 
         exitCode = result.exitCode;
         timedOut = result.timedOut;
         costUsd = result.costUsd;
         inputTokens = result.inputTokens;
         outputTokens = result.outputTokens;
+
+        // Store session ID for potential resume
+        if (result.sessionId) {
+          state.currentSessionId = result.sessionId;
+        }
+
+        // Accumulate total cost
+        if (costUsd !== undefined) {
+          state.totalCostUsd = (state.totalCostUsd || 0) + costUsd;
+        }
 
         // Success or timeout (don't retry timeouts)
         if (exitCode === 0 || timedOut) {
@@ -898,6 +917,9 @@ EXAMPLES
     console.log(`\nInitiative: ${sprintTask.initiative}`);
     console.log(`Sessions: ${state.sessions.length}`);
     console.log(`Total commits: ${state.totalCommits}`);
+    if (state.totalCostUsd !== undefined) {
+      console.log(`Total cost: $${state.totalCostUsd.toFixed(4)}`);
+    }
     console.log(`Status: ${state.status}`);
     console.log(`\nSession logs: .shiplog/autopilot-state.json\n`);
 
