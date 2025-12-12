@@ -3,10 +3,7 @@ import * as fs from "fs";
 import * as path from "path";
 import {
   getSHIPmd,
-  getSHIPDESIGNmd,
   getSTATUSmd,
-  getRAMPmd,
-  getPLANmd,
   getSessionEndHookSh,
   getSessionStartHookSh,
   getSETTINGSjson,
@@ -19,18 +16,18 @@ interface UpgradeOptions {
 
 export const upgradeCommand = new Command("upgrade")
   .description(
-    "Upgrade an existing shiplog installation to v2.\n\n" +
-      "Safely updates command templates and adds new features:\n" +
-      "  - Adds /ship command (unified entry point)\n" +
-      "  - Adds /ship design command (creative mode)\n" +
-      "  - Adds session hooks for auto-metadata capture\n" +
-      "  - Updates /status, /ramp, /plan with v2 improvements\n\n" +
+    "Upgrade an existing shiplog installation to latest.\n\n" +
+      "Safely updates command templates:\n" +
+      "  - Updates /ship (unified command with auto mode detection)\n" +
+      "  - Updates /status (health check command)\n" +
+      "  - Updates session hooks for auto-metadata capture\n" +
+      "  - Removes obsolete commands (ramp, plan, ship-design)\n\n" +
       "Your content files (PROGRESS.md, DECISIONS.md, HANDOFF.md, sprints/)\n" +
       "are preserved. Only command templates are updated.\n\n" +
       "Examples:\n" +
       "  $ shiplog upgrade              # Upgrade with backup\n" +
       "  $ shiplog upgrade --no-backup  # Upgrade without backup\n" +
-      "  $ shiplog upgrade --force      # Overwrite even if already v2"
+      "  $ shiplog upgrade --force      # Force re-apply templates"
   )
   .option("-f, --force", "Overwrite even if already at v2", false)
   .option("--no-backup", "Skip backing up existing commands", false)
@@ -93,32 +90,17 @@ export const upgradeCommand = new Command("upgrade")
 
     // Files to create/update
     const files = [
-      // New v2 commands
+      // Unified /ship command (handles design, continue, planning, quick tasks)
       {
         path: ".claude/commands/ship.md",
         content: getSHIPmd(projectName),
         description: "unified /ship command",
       },
-      {
-        path: ".claude/commands/ship-design.md",
-        content: getSHIPDESIGNmd(projectName),
-        description: "/ship design mode",
-      },
-      // Updated v1 commands
+      // Status command
       {
         path: ".claude/commands/status.md",
         content: getSTATUSmd(projectName),
         description: "/status command",
-      },
-      {
-        path: ".claude/commands/ramp.md",
-        content: getRAMPmd(projectName),
-        description: "/ramp command (with /ship redirect)",
-      },
-      {
-        path: ".claude/commands/plan.md",
-        content: getPLANmd(projectName),
-        description: "/plan command (with /ship redirect)",
       },
       // Hooks
       {
@@ -134,6 +116,22 @@ export const upgradeCommand = new Command("upgrade")
         executable: true,
       },
     ];
+
+    // Remove obsolete commands
+    const obsoleteCommands = [
+      ".claude/commands/ramp.md",
+      ".claude/commands/plan.md",
+      ".claude/commands/ship-design.md",
+    ];
+    let removed = 0;
+    for (const obsolete of obsoleteCommands) {
+      const obsoletePath = path.join(cwd, obsolete);
+      if (fs.existsSync(obsoletePath)) {
+        fs.unlinkSync(obsoletePath);
+        console.log(`  🗑️  Removed ${obsolete} (obsolete)`);
+        removed++;
+      }
+    }
 
     // Create/update files
     let updated = 0;
@@ -213,15 +211,16 @@ export const upgradeCommand = new Command("upgrade")
     console.log(`\n✨ Upgrade complete!`);
     console.log(`   Added: ${added} files`);
     console.log(`   Updated: ${updated} files`);
+    if (removed > 0) {
+      console.log(`   Removed: ${removed} obsolete commands`);
+    }
     if (settingsUpdated) {
       console.log(`   Settings: hooks configured`);
     }
 
-    console.log("\nWhat's new in v2:");
-    console.log("  • /ship — Unified command (auto-detects plan vs continue)");
-    console.log("  • /ship design — Lighter mode for creative/aesthetic work");
-    console.log("  • Session hooks — Auto-capture metadata between sessions");
-    console.log("  • Driver's seat persona — Baked into all commands\n");
+    console.log("\nCommands:");
+    console.log("  • /ship — Unified command (auto-detects mode: design, continue, planning)");
+    console.log("  • /status — Quick health check\n");
 
     console.log("Your content files were preserved:");
     console.log("  • docs/PROGRESS.md");

@@ -82,8 +82,6 @@ export const doctorCommand = new Command("doctor")
       { path: "docs/HANDOFF.md", critical: true },
       { path: ".claude/commands/ship.md", critical: true },
       { path: ".claude/commands/status.md", critical: false },
-      { path: ".claude/commands/ramp.md", critical: false },
-      { path: ".claude/commands/plan.md", critical: false },
       { path: ".claude/hooks/session-start.sh", critical: false },
       { path: ".claude/hooks/session-end.sh", critical: false },
     ];
@@ -243,18 +241,13 @@ export const doctorCommand = new Command("doctor")
     checksRun++;
     const shipMdPath = path.join(cwd, ".claude/commands/ship.md");
     if (fs.existsSync(shipMdPath)) {
-      console.log(`✓ Version: v2 (ship.md present)`);
+      console.log(`✓ Version: current (ship.md present)`);
       checksPassed++;
     } else {
-      const rampMdPath = path.join(cwd, ".claude/commands/ramp.md");
-      if (fs.existsSync(rampMdPath)) {
-        console.log(`⚠ Version: v1 (consider running 'shiplog upgrade')`);
-        issues.push({
-          type: "warning",
-          message: `Running v1 - upgrade available`,
-          fixDescription: `Run 'shiplog upgrade' for v2 features`,
-        });
-      }
+      issues.push({
+        type: "error",
+        message: `Missing ship.md - run 'shiplog init --force' to create`,
+      });
     }
 
     // ========================================

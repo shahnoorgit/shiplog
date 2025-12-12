@@ -56,12 +56,9 @@ describe('shiplog init', () => {
     expect(fs.existsSync(path.join(tempDir, 'docs/DECISIONS.md'))).toBe(true);
     expect(fs.existsSync(path.join(tempDir, 'docs/HANDOFF.md'))).toBe(true);
 
-    // Check v2 command files exist
+    // Check command files exist
     expect(fs.existsSync(path.join(tempDir, '.claude/commands/ship.md'))).toBe(true);
-    expect(fs.existsSync(path.join(tempDir, '.claude/commands/ship-design.md'))).toBe(true);
     expect(fs.existsSync(path.join(tempDir, '.claude/commands/status.md'))).toBe(true);
-    expect(fs.existsSync(path.join(tempDir, '.claude/commands/ramp.md'))).toBe(true);
-    expect(fs.existsSync(path.join(tempDir, '.claude/commands/plan.md'))).toBe(true);
 
     // Check hooks exist
     expect(fs.existsSync(path.join(tempDir, '.claude/hooks/session-start.sh'))).toBe(true);
@@ -155,8 +152,8 @@ describe('shiplog upgrade', () => {
     expect(() => runShiplog('upgrade', tempDir)).toThrow();
   });
 
-  it('adds v2 files to v1 installation', () => {
-    // Create minimal v1 structure
+  it('adds current files to old installation', () => {
+    // Create minimal old structure
     fs.mkdirSync(path.join(tempDir, '.claude/commands'), { recursive: true });
     fs.mkdirSync(path.join(tempDir, 'docs'), { recursive: true });
     fs.writeFileSync(path.join(tempDir, 'CLAUDE.md'), '# test-project');
@@ -165,22 +162,25 @@ describe('shiplog upgrade', () => {
 
     runShiplog('upgrade', tempDir);
 
-    // v2 files should exist
+    // Current files should exist
     expect(fs.existsSync(path.join(tempDir, '.claude/commands/ship.md'))).toBe(true);
-    expect(fs.existsSync(path.join(tempDir, '.claude/commands/ship-design.md'))).toBe(true);
+    expect(fs.existsSync(path.join(tempDir, '.claude/commands/status.md'))).toBe(true);
     expect(fs.existsSync(path.join(tempDir, '.claude/hooks/session-start.sh'))).toBe(true);
     expect(fs.existsSync(path.join(tempDir, '.claude/hooks/session-end.sh'))).toBe(true);
+
+    // Obsolete files should be removed
+    expect(fs.existsSync(path.join(tempDir, '.claude/commands/ramp.md'))).toBe(false);
   });
 
   it('creates backup of existing commands', () => {
-    // Create minimal v1 structure
+    // Create minimal old structure with custom ship.md
     fs.mkdirSync(path.join(tempDir, '.claude/commands'), { recursive: true });
     fs.mkdirSync(path.join(tempDir, 'docs'), { recursive: true });
     fs.writeFileSync(path.join(tempDir, 'CLAUDE.md'), '# test-project');
-    fs.writeFileSync(path.join(tempDir, '.claude/commands/ramp.md'), 'original ramp content');
+    fs.writeFileSync(path.join(tempDir, '.claude/commands/ship.md'), 'original ship content');
     fs.writeFileSync(path.join(tempDir, '.claude/settings.json'), '{}');
 
-    runShiplog('upgrade', tempDir);
+    runShiplog('upgrade --force', tempDir);
 
     // Backup directory should exist
     const backupDirs = fs.readdirSync(path.join(tempDir, '.claude'))
@@ -189,10 +189,10 @@ describe('shiplog upgrade', () => {
 
     // Original content should be in backup
     const backupContent = fs.readFileSync(
-      path.join(tempDir, '.claude', backupDirs[0], 'ramp.md'),
+      path.join(tempDir, '.claude', backupDirs[0], 'ship.md'),
       'utf-8'
     );
-    expect(backupContent).toBe('original ramp content');
+    expect(backupContent).toBe('original ship content');
   });
 
   it('preserves mcpServers in settings', () => {
@@ -404,29 +404,32 @@ describe('command files content', () => {
     expect(shipMd).toContain('drift');
   });
 
-  it('ship-design.md is lighter structure', () => {
-    const designMd = fs.readFileSync(path.join(tempDir, '.claude/commands/ship-design.md'), 'utf-8');
+  it('ship.md includes design mode', () => {
+    const shipMd = fs.readFileSync(path.join(tempDir, '.claude/commands/ship.md'), 'utf-8');
 
-    expect(designMd).toContain('design work');
-    expect(designMd).toContain('lighter structure');
-    expect(designMd).toContain('No sprint file required');
-    expect(designMd).toContain('frontend-design');
+    expect(shipMd).toContain('Design Mode');
+    expect(shipMd).toContain('design signals');
+    expect(shipMd).toContain('frontend-design');
   });
 
-  it('ramp.md and plan.md redirect to /ship', () => {
-    const rampMd = fs.readFileSync(path.join(tempDir, '.claude/commands/ramp.md'), 'utf-8');
-    const planMd = fs.readFileSync(path.join(tempDir, '.claude/commands/plan.md'), 'utf-8');
+  it('ship.md includes quick task mode', () => {
+    const shipMd = fs.readFileSync(path.join(tempDir, '.claude/commands/ship.md'), 'utf-8');
 
-    expect(rampMd).toContain('Consider using `/ship`');
-    expect(planMd).toContain('Consider using `/ship`');
+    expect(shipMd).toContain('Quick Task Mode');
+    expect(shipMd).toContain('No sprint file needed');
+  });
+
+  it('ship.md emphasizes starting work immediately after planning', () => {
+    const shipMd = fs.readFileSync(path.join(tempDir, '.claude/commands/ship.md'), 'utf-8');
+
+    expect(shipMd).toContain('START WORKING IMMEDIATELY');
+    expect(shipMd).toContain('Do NOT tell the user to run autopilot separately');
   });
 
   it('status.md recommends /ship', () => {
     const statusMd = fs.readFileSync(path.join(tempDir, '.claude/commands/status.md'), 'utf-8');
 
     expect(statusMd).toContain('/ship');
-    // Should NOT recommend /ramp anymore
-    expect(statusMd).not.toContain('Run /ramp');
   });
 });
 
@@ -652,20 +655,20 @@ describe('shiplog doctor', () => {
     expect(output).toContain('ship.md');
   });
 
-  it('detects v1 installation needing upgrade', () => {
-    // Create v1 structure (has ramp.md but no ship.md)
+  it('detects installation missing ship.md', () => {
+    // Create structure without ship.md
     fs.mkdirSync(path.join(tempDir, '.claude/commands'), { recursive: true });
     fs.mkdirSync(path.join(tempDir, '.claude/hooks'), { recursive: true });
     fs.mkdirSync(path.join(tempDir, 'docs/sprints'), { recursive: true });
     fs.writeFileSync(path.join(tempDir, 'CLAUDE.md'), '# test');
     fs.writeFileSync(path.join(tempDir, 'docs/PROGRESS.md'), 'test');
     fs.writeFileSync(path.join(tempDir, 'docs/HANDOFF.md'), 'test');
-    fs.writeFileSync(path.join(tempDir, '.claude/commands/ramp.md'), 'test');
+    fs.writeFileSync(path.join(tempDir, '.claude/commands/status.md'), 'test');
 
     const output = runShiplog('doctor', tempDir, true);
 
-    expect(output).toContain('v1');
-    expect(output).toContain('upgrade');
+    expect(output).toContain('ship.md');
+    expect(output).toContain('Missing');
   });
 
   it('detects invalid hook format (object matcher)', () => {

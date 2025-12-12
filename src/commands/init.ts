@@ -18,7 +18,7 @@ export const initCommand = new Command("init")
   .description(
     "Initialize shiplog in the current directory.\n\n" +
       "Creates the infrastructure needed for long-running AI agent sessions:\n" +
-      "  - .claude/ directory with /status, /ramp, /plan commands\n" +
+      "  - .claude/ directory with /ship and /status commands\n" +
       "  - docs/ directory with progress tracking files\n" +
       "  - CLAUDE.md project instructions template\n\n" +
       "Examples:\n" +
@@ -30,7 +30,7 @@ export const initCommand = new Command("init")
   .option("-n, --name <name>", "Project name for CLAUDE.md header")
   .option(
     "-m, --minimal",
-    "Only create essential files (PROGRESS, DECISIONS, HANDOFF, /ramp)",
+    "Only create essential files (PROGRESS, DECISIONS, HANDOFF, /ship)",
     false
   )
   .option("--no-voice", "Skip CLAUDE_VOICE.md template")
@@ -82,16 +82,6 @@ export const initCommand = new Command("init")
         minimalInclude: true,
       },
       {
-        path: ".claude/commands/ramp.md",
-        content: getRAMPmd(projectName),
-        minimalInclude: true,
-      },
-      {
-        path: ".claude/commands/plan.md",
-        content: getPLANmd(projectName),
-        minimalInclude: true,
-      },
-      {
         path: ".claude/commands/status.md",
         content: getSTATUSmd(projectName),
         minimalInclude: true,
@@ -102,15 +92,10 @@ export const initCommand = new Command("init")
         minimalInclude: true,
       },
 
-      // V2: New unified commands
+      // Unified /ship command with auto-mode detection (design, continue, planning)
       {
         path: ".claude/commands/ship.md",
         content: getSHIPmd(projectName),
-        minimalInclude: true,
-      },
-      {
-        path: ".claude/commands/ship-design.md",
-        content: getSHIPDESIGNmd(projectName),
         minimalInclude: true,
       },
       {
@@ -192,8 +177,10 @@ export const initCommand = new Command("init")
     console.log("Next steps:");
     console.log("  1. Review and customize CLAUDE.md for your project");
     console.log("  2. Add your project's commands and patterns");
-    console.log("  3. Use /ship to start working (auto-detects plan vs continue mode)");
-    console.log("  4. Use /ship design for aesthetic/creative work\n");
+    console.log("  3. Use /ship to start working\n");
+    console.log("Commands:");
+    console.log("  /ship    — Work on the project (auto-detects mode)");
+    console.log("  /status  — Quick health check\n");
   });
 
 // Template functions
@@ -415,8 +402,8 @@ docs/DECISIONS.md
 docs/HANDOFF.md
 docs/FEATURES.json
 docs/CLAUDE_VOICE.md
-.claude/commands/ramp.md
-.claude/session-start.md
+.claude/commands/ship.md
+.claude/commands/status.md
 .claude/settings.json
 \`\`\`
 `;
@@ -513,7 +500,7 @@ Need human access to something? I ask clearly and wait.
 ## Session Discipline
 
 Every session:
-1. Start with /status or /ramp — understand where we are
+1. Start with /ship — it auto-detects what to do
 2. Work on ONE thing at a time
 3. Commit frequently with clear messages
 4. Update HANDOFF.md before ending — the next session depends on it
@@ -863,7 +850,7 @@ function getSETTINGSjson(): string {
 `;
 }
 
-// V2: Unified /ship command with smart mode detection
+// Unified /ship command with auto mode detection (design, continue, planning, quick task)
 function getSHIPmd(projectName: string): string {
   return `You are working on **${projectName}**.
 
@@ -871,64 +858,84 @@ ${getDriverSeatPersona()}
 
 ---
 
-## Quick Mode Detection
+## Mode Detection (Do This First)
 
-Check what mode to use:
+**Step 1: Check for design signals in user message**
+If the user's request mentions any of: UI, UX, design, redesign, visual, layout, styles, CSS, look and feel, mobile, responsive, colors, typography, animation, component design → **Design Mode**
 
-1. Run \`ls docs/sprints/*.json 2>/dev/null | head -1\` to find active sprints
-2. If a sprint exists with incomplete features → **Continue Mode**
-3. If no sprint exists or all features pass → **Planning Mode**
-4. If user provides a new goal/task → **Planning Mode**
+**Step 2: Check for active sprints**
+\`\`\`bash
+ls docs/sprints/*.json 2>/dev/null | head -1
+\`\`\`
+
+**Step 3: Determine mode**
+- Design signals detected → **Design Mode**
+- Active sprint with incomplete features → **Continue Mode**
+- No sprint OR all features complete → **Planning Mode**
+- User provides a specific task/bug → **Quick Task Mode** (no sprint needed)
+
+---
+
+## Design Mode
+
+For visual/UI work, skip the sprint ceremony. Design is iterative, not checkbox-driven.
+
+### Workflow
+1. **Understand the vision** - What's the aesthetic goal? Target audience? Reference designs?
+2. **Invoke the frontend-design skill** if available: use the Skill tool with \`frontend-design\`
+3. **Iterate visually** - Make changes → screenshot/describe → get feedback → refine
+4. **When satisfied** - Commit the final design, update PROGRESS.md
+
+### Design Principles
+- **Consistency** - Colors, spacing, typography should feel unified
+- **Hierarchy** - Important things should be visually prominent
+- **Breathing room** - Don't crowd elements; whitespace is good
+- **Feedback** - Interactive elements should respond (hover, active states)
 
 ---
 
 ## Continue Mode (Sprint In Progress)
 
 ### Get Bearings (2 min max)
-1. Read \`docs/PROGRESS.md\` — What's done? What's next?
+1. Read \`docs/PROGRESS.md\` — What's done?
 2. Read \`docs/HANDOFF.md\` — Last session's state
 3. Read the active sprint file in \`docs/sprints/\`
 4. Run \`git status\` — Any uncommitted changes?
-
-### Verify Environment
-\`\`\`bash
-git status              # Clean state?
-npm test                # Tests passing?
-npm run dev             # Dev server starts?
-\`\`\`
 
 ### Execute
 1. Pick next incomplete feature from sprint file
 2. Work on **ONE feature at a time**
 3. Commit frequently with descriptive messages
 4. Mark feature as \`passes: true\` when tested end-to-end
-5. Update PROGRESS.md as items complete
+5. Continue to next feature
 
 ### Before Ending
 1. Update \`docs/HANDOFF.md\` with current state
 2. Commit all work
-3. Leave codebase in clean, working state
 
 ---
 
 ## Planning Mode (New Initiative)
 
-If starting new work:
+### Step 1: Understand
+Ask: **"What are we building?"** if unclear. Otherwise, proceed with what the user stated.
 
-1. **Ask**: "What are we building? Describe the goal."
-2. **Explore**: Read codebase for relevant patterns
-3. **Clarify**: Ask questions about scope, approach, constraints
-4. **Design**: Create implementation plan
-5. **Create Sprint**: Save to \`docs/sprints/YYYY-MM-DD-<slug>.json\`
-6. **Update PROGRESS.md**: Add new initiative
-7. **Begin**: Start on first feature
+### Step 2: Explore
+- Read codebase for relevant patterns
+- Identify files/components that will be affected
+- Clarify scope if needed
 
-### Sprint File Format
+### Step 3: Create Sprint
+Save to \`docs/sprints/YYYY-MM-DD-<slug>.json\`:
 \`\`\`json
 {
   "initiative": "Initiative Name",
   "created": "YYYY-MM-DD",
   "status": "in_progress",
+  "context": {
+    "test_command": "pnpm test",
+    "quality_criteria": ["Tests pass", "No TypeScript errors"]
+  },
   "features": [
     {
       "id": "feat-001",
@@ -940,34 +947,45 @@ If starting new work:
 }
 \`\`\`
 
-**CRITICAL**: Feature descriptions are IMMUTABLE. You can only update \`passes\` to \`true\`.
+### Step 4: START WORKING IMMEDIATELY
+**CRITICAL:** After creating the sprint, immediately begin working on the first feature. Do NOT tell the user to run autopilot separately. Just start.
+
+If the user wants to step away for autonomous work, they can:
+- Press Ctrl+C to exit
+- Run \`shiplog autopilot\` later
+
+But by default, **you start working right away**.
+
+---
+
+## Quick Task Mode
+
+For small tasks that don't need a sprint (bug fixes, small changes, questions):
+
+1. Understand what's needed
+2. Do it
+3. Commit with descriptive message
+4. Done
+
+No sprint file needed for quick wins.
 
 ---
 
 ## Post-Compaction Recovery
 
 If you've just resumed after context compaction:
-
 1. **Re-read** the current sprint file immediately
 2. **Check alignment**: "Is what I'm about to do aligned with the sprint?"
-3. **If drifted**: Stop and re-orient before continuing
-4. **If aligned**: Continue with renewed focus
-
-This prevents drift after context loss.
+3. **If drifted**: Stop and re-orient
+4. **If aligned**: Continue
 
 ---
 
-## Quick Status Check
-
-Run \`/ship status\` or \`/status\` to see:
-- Current sprint progress
-- Recent commits
-- Any uncommitted changes
-- Test status
-
----
-
-**Key principle:** One feature at a time. Leave code working. Update HANDOFF.md before ending.
+**Key principles:**
+- One feature at a time
+- Leave code working
+- After planning, START WORKING (don't wait for autopilot)
+- Design mode = visual iteration, not checkboxes
 `;
 }
 
@@ -1143,12 +1161,8 @@ exit 0
 
 // Export template functions for upgrade command
 export {
-  getDriverSeatPersona,
   getSHIPmd,
-  getSHIPDESIGNmd,
   getSTATUSmd,
-  getRAMPmd,
-  getPLANmd,
   getSessionEndHookSh,
   getSessionStartHookSh,
   getSETTINGSjson,

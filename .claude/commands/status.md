@@ -69,10 +69,10 @@ Run these validation checks and report any issues:
 
 End with a clear recommendation:
 
-- **All clear** → "✅ Ready to continue. Run /ramp to pick up where you left off."
-- **Minor issues** → "⚠️ Minor issues found. Review above, then /ramp."
+- **All clear** → "✅ Ready to continue. Run /ship to pick up where you left off."
+- **Minor issues** → "⚠️ Minor issues found. Review above, then /ship."
 - **Blocking issues** → "❌ Blocking issues. Fix before continuing."
 
 ---
 
-**Tip:** Run /status at the start of any session to quickly understand state without diving into work.
+**Tip:** Run /status at the start of any session for a quick health check.
