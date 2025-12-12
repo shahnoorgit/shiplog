@@ -16,6 +16,7 @@ interface AutopilotOptions {
   timeout: number; // Session timeout in seconds
   maxRetries: number; // Max retries per session on failure
   maxBudget: number; // Max budget per session in USD
+  model: string; // Claude model to use (sonnet/opus/haiku)
   resume: boolean; // Continue from interrupted state
   fresh: boolean; // Start fresh, ignore existing state
   dryRun: boolean;
@@ -26,6 +27,7 @@ interface SessionLog {
   iteration: number;
   startTime: string;
   endTime?: string;
+  durationSeconds?: number;
   startCommits: number;
   endCommits?: number;
   commitsMade?: number;
@@ -49,6 +51,7 @@ interface AutopilotState {
   sessions: SessionLog[];
   currentSessionId?: string; // SDK session ID for resume
   totalCostUsd?: number; // Accumulated cost across all sessions
+  totalDurationSeconds?: number; // Total time spent across all sessions
   status: "running" | "completed" | "stalled" | "interrupted";
 }
 
@@ -229,6 +232,76 @@ function loadState(cwd: string): AutopilotState | null {
   return null;
 }
 
+/**
+ * Map friendly model names to SDK model IDs
+ */
+function getModelId(friendlyName: string): string {
+  const modelMap: Record<string, string> = {
+    sonnet: "claude-sonnet-4-5-20250929",
+    opus: "claude-opus-4-5-20251101",
+    haiku: "claude-3-5-haiku-20241022",
+  };
+
+  const normalized = friendlyName.toLowerCase();
+  return modelMap[normalized] || modelMap.sonnet; // Default to sonnet
+}
+
+/**
+ * Format duration in seconds to human-readable string
+ */
+function formatDuration(seconds: number): string {
+  if (seconds < 60) {
+    return `${seconds}s`;
+  }
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  if (minutes < 60) {
+    return `${minutes}m ${remainingSeconds}s`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return `${hours}h ${remainingMinutes}m`;
+}
+
+/**
+ * Format tool use for display with relevant details
+ * Extracts file paths, commands, etc. and truncates if needed
+ */
+function formatToolUse(toolName: string, toolInput: any): string {
+  // Truncate helper - keeps start and end of long strings
+  const truncate = (str: string, maxLen: number = 60): string => {
+    if (str.length <= maxLen) return str;
+    const prefixLen = Math.floor(maxLen * 0.6);
+    const suffixLen = Math.floor(maxLen * 0.3);
+    return `${str.slice(0, prefixLen)}...${str.slice(-suffixLen)}`;
+  };
+
+  // Extract relevant details based on tool type
+  let details = "";
+
+  try {
+    if (toolName === "Read" && toolInput?.file_path) {
+      details = ` ${truncate(toolInput.file_path, 50)}`;
+    } else if (toolName === "Write" && toolInput?.file_path) {
+      details = ` ${truncate(toolInput.file_path, 50)}`;
+    } else if (toolName === "Edit" && toolInput?.file_path) {
+      details = ` ${truncate(toolInput.file_path, 50)}`;
+    } else if (toolName === "Bash" && toolInput?.command) {
+      // Show abbreviated command (first line, truncated)
+      const firstLine = toolInput.command.split("\n")[0];
+      details = ` ${truncate(firstLine, 45)}`;
+    } else if (toolName === "Glob" && toolInput?.pattern) {
+      details = ` ${truncate(toolInput.pattern, 40)}`;
+    } else if (toolName === "Grep" && toolInput?.pattern) {
+      details = ` "${truncate(toolInput.pattern, 35)}"`;
+    }
+  } catch {
+    // If extraction fails, just show tool name
+  }
+
+  return `🔧 ${toolName}${details}`;
+}
+
 function generateContinuationPrompt(
   cwd: string,
   iteration: number,
@@ -324,7 +397,7 @@ async function runClaudeSession(
 
   // Configure SDK options
   const sdkOptions: Options = {
-    model: "claude-sonnet-4-5-20250929",
+    model: getModelId(options.model),
     cwd,
     maxBudgetUsd: options.maxBudget,
     permissionMode: "acceptEdits", // Auto-approve edits in autopilot mode
@@ -362,7 +435,7 @@ async function runClaudeSession(
           if (block.type === "text") {
             process.stdout.write(block.text);
           } else if (block.type === "tool_use") {
-            console.log(`\n🔧 ${block.name}`);
+            console.log(`\n${formatToolUse(block.name, block.input)}`);
           }
         }
       }
@@ -581,8 +654,10 @@ FILES CREATED
   docs/SKILLBOOK.md            - Accumulated learnings (persists)
 
 EXAMPLES
-  $ shiplog autopilot              # Start with sensible defaults
+  $ shiplog autopilot              # Start with sensible defaults (Sonnet)
   $ shiplog autopilot --dry-run    # See what would happen, don't run
+  $ shiplog autopilot -m opus      # Use Claude Opus (slower, more capable)
+  $ shiplog autopilot -m haiku     # Use Claude Haiku (faster, cheaper)
   $ shiplog autopilot -n 50        # Allow up to 50 sessions
   $ shiplog autopilot -s 5         # More patience before stall detection
   $ shiplog autopilot -n 10 -s 2   # Quick run, fail fast on stalls`
@@ -611,6 +686,11 @@ EXAMPLES
     "-b, --max-budget <usd>",
     "Max budget per session in USD (default: 5.0)",
     "5.0"
+  )
+  .option(
+    "-m, --model <name>",
+    "Claude model to use: sonnet (default), opus, or haiku",
+    "sonnet"
   )
   .option(
     "--resume",
@@ -655,6 +735,10 @@ EXAMPLES
       typeof options.maxBudget === "string"
         ? parseFloat(options.maxBudget)
         : options.maxBudget;
+    const model =
+      typeof options.model === "string"
+        ? options.model
+        : "sonnet";
 
     console.log("\n" + "=".repeat(60));
     console.log("  🚁 Shiplog Autopilot");
@@ -672,6 +756,7 @@ EXAMPLES
 
     console.log(`\n📋 Initiative: ${sprintTask.initiative}`);
     console.log(`📌 Current task: ${sprintTask.task}`);
+    console.log(`🤖 Model: ${model} (${getModelId(model)})`);
     console.log(`🔄 Max iterations: ${maxIterations}`);
     console.log(`⏸️  Stall threshold: ${stallThreshold} iterations`);
     console.log(`⏱️  Session timeout: ${Math.floor(timeout / 60)} minutes`);
@@ -791,6 +876,7 @@ EXAMPLES
           timeout,
           maxRetries,
           maxBudget,
+          model,
         }, state.currentSessionId);
 
         exitCode = result.exitCode;
@@ -830,7 +916,13 @@ EXAMPLES
       // Check for file changes (soft progress)
       const { changedFiles, sprintFileModified } = getFileChanges(cwd);
 
-      sessionLog.endTime = new Date().toISOString();
+      const endTime = new Date().toISOString();
+      const durationSeconds = Math.floor(
+        (new Date(endTime).getTime() - new Date(sessionLog.startTime).getTime()) / 1000
+      );
+
+      sessionLog.endTime = endTime;
+      sessionLog.durationSeconds = durationSeconds;
       sessionLog.endCommits = endCommits;
       sessionLog.commitsMade = commitsMade;
       sessionLog.filesChanged = changedFiles;
@@ -845,7 +937,13 @@ EXAMPLES
 
       state.totalCommits += commitsMade;
 
+      // Accumulate total duration
+      if (durationSeconds !== undefined) {
+        state.totalDurationSeconds = (state.totalDurationSeconds || 0) + durationSeconds;
+      }
+
       console.log(`\n📊 Session ${iteration} Results:`);
+      console.log(`   Duration: ${formatDuration(durationSeconds)}`);
       console.log(`   Commits made: ${commitsMade}`);
       console.log(`   Files changed: ${changedFiles}${sprintFileModified ? " (sprint updated)" : ""}`);
       if (retriesUsed > 0) {
@@ -917,6 +1015,9 @@ EXAMPLES
     console.log(`\nInitiative: ${sprintTask.initiative}`);
     console.log(`Sessions: ${state.sessions.length}`);
     console.log(`Total commits: ${state.totalCommits}`);
+    if (state.totalDurationSeconds !== undefined) {
+      console.log(`Total time: ${formatDuration(state.totalDurationSeconds)}`);
+    }
     if (state.totalCostUsd !== undefined) {
       console.log(`Total cost: $${state.totalCostUsd.toFixed(4)}`);
     }

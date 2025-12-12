@@ -4,6 +4,8 @@
 
 ## What Works
 
+- Tests added/updated: "test: SDK integration test passed"
+- Tests added/updated: "test: add SDK verification sprint + pirate terminology"
 - Tests added/updated: "test: add SDK verification sprint + pirate terminology"
 - **Streaming JSON for real-time output**: Use `claude -p --verbose --output-format stream-json --include-partial-messages` to get chunked output instead of buffered
 - **Parsing stream events**: Look for `event.type === "stream_event"` then `event.event.type === "content_block_delta"` with `event.event.delta.text`
@@ -26,4 +28,4 @@
 
 ---
 
-*Last updated: 2025-12-12T00:32:23.286Z*
+*Last updated: 2025-12-12T00:57:11.826Z*

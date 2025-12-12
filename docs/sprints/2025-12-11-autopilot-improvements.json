@@ -17,8 +17,8 @@
         "Show selected model in startup output",
         "Update help text with available models"
       ],
-      "passes": false,
-      "notes": "Lets users choose speed vs capability tradeoff"
+      "passes": true,
+      "notes": "Lets users choose speed vs capability tradeoff. Implemented with getModelId() helper function."
     },
     {
       "id": "qol-002",
@@ -29,8 +29,8 @@
         "For Bash, show abbreviated command",
         "Keep output concise - truncate long paths/commands"
       ],
-      "passes": false,
-      "notes": "Makes it easier to follow what autopilot is doing"
+      "passes": true,
+      "notes": "Makes it easier to follow what autopilot is doing. Implemented formatToolUse() helper with smart truncation."
     },
     {
       "id": "qol-003",
@@ -41,8 +41,8 @@
         "Add duration to SessionLog interface",
         "Show in autopilot summary: Total time: Xm Ys"
       ],
-      "passes": false,
-      "notes": "Useful for understanding how long things take"
+      "passes": true,
+      "notes": "Useful for understanding how long things take. Added durationSeconds to SessionLog and totalDurationSeconds to AutopilotState with formatDuration() helper."
     }
   ]
 }
