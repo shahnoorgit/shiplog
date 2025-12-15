@@ -218,16 +218,18 @@ describe('shiplog upgrade', () => {
   });
 
   it('detects already-upgraded projects', () => {
-    // Create v2 structure (has ship.md)
+    // Create fully up-to-date structure (has ship.md AND autonomy hooks)
     fs.mkdirSync(path.join(tempDir, '.claude/commands'), { recursive: true });
+    fs.mkdirSync(path.join(tempDir, '.claude/hooks/autonomy'), { recursive: true });
     fs.mkdirSync(path.join(tempDir, 'docs'), { recursive: true });
     fs.writeFileSync(path.join(tempDir, 'CLAUDE.md'), '# test-project');
     fs.writeFileSync(path.join(tempDir, '.claude/commands/ship.md'), 'existing ship content');
+    fs.writeFileSync(path.join(tempDir, '.claude/hooks/autonomy/stop-hook.sh'), '#!/bin/bash');
     fs.writeFileSync(path.join(tempDir, '.claude/settings.json'), '{}');
 
     const output = runShiplog('upgrade', tempDir);
 
-    expect(output).toContain('Already at v2');
+    expect(output).toContain('Already up to date');
   });
 
   it('re-applies templates with --force', () => {

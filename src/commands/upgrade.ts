@@ -62,10 +62,24 @@ export const upgradeCommand = new Command("upgrade")
 
     // Check if already v2 (has ship.md)
     const shipMdPath = path.join(commandsDir, "ship.md");
-    if (fs.existsSync(shipMdPath) && !options.force) {
-      console.log("  ℹ️  Already at v2 (ship.md exists).");
-      console.log("     Use --force to re-apply v2 templates.\n");
+    const hasV2 = fs.existsSync(shipMdPath);
+
+    // Check if autonomy hooks are missing (added in v1.8)
+    const autonomyHooksDir = path.join(claudeDir, "hooks", "autonomy");
+    const stopHookPath = path.join(autonomyHooksDir, "stop-hook.sh");
+    const hasAutonomyHooks = fs.existsSync(stopHookPath);
+
+    // If already at v2 AND has autonomy hooks, nothing to do (unless --force)
+    if (hasV2 && hasAutonomyHooks && !options.force) {
+      console.log("  ℹ️  Already up to date.");
+      console.log("     Use --force to re-apply all templates.\n");
       return;
+    }
+
+    // Report what we're upgrading
+    const onlyAddingHooks = hasV2 && !hasAutonomyHooks && !options.force;
+    if (onlyAddingHooks) {
+      console.log("  📦 Adding autonomy hooks (new in v1.8)...\n");
     }
 
     // Create directories if missing
@@ -78,8 +92,8 @@ export const upgradeCommand = new Command("upgrade")
       }
     }
 
-    // Backup existing commands if requested
-    if (!options.noBackup && fs.existsSync(commandsDir)) {
+    // Backup existing commands if requested (skip if only adding hooks)
+    if (!onlyAddingHooks && !options.noBackup && fs.existsSync(commandsDir)) {
       const backupDir = path.join(claudeDir, "commands.backup");
       const timestamp = new Date().toISOString().split("T")[0];
       const backupPath = `${backupDir}-${timestamp}`;
@@ -91,60 +105,66 @@ export const upgradeCommand = new Command("upgrade")
     }
 
     // Files to create/update
-    const files = [
+    // When only adding hooks, skip command files and regular hooks (already exist)
+    const files: Array<{ path: string; content: string; description: string; executable?: boolean }> = [];
+
+    if (!onlyAddingHooks) {
       // Unified /ship command (handles design, continue, planning, quick tasks)
-      {
+      files.push({
         path: ".claude/commands/ship.md",
         content: getSHIPmd(projectName),
         description: "unified /ship command",
-      },
+      });
       // Status command
-      {
+      files.push({
         path: ".claude/commands/status.md",
         content: getSTATUSmd(projectName),
         description: "/status command",
-      },
+      });
       // Hooks
-      {
+      files.push({
         path: ".claude/hooks/session-end.sh",
         content: getSessionEndHookSh(),
         description: "session-end hook",
         executable: true,
-      },
-      {
+      });
+      files.push({
         path: ".claude/hooks/session-start.sh",
         content: getSessionStartHookSh(),
         description: "session-start hook",
         executable: true,
-      },
-      // Autonomy hooks (dormant until activated)
-      {
-        path: ".claude/hooks/autonomy/stop-hook.sh",
-        content: getAutonomyStopHookSh(),
-        description: "autonomy stop hook",
-        executable: true,
-      },
-      {
-        path: ".claude/hooks/autonomy/session-start-autonomy.sh",
-        content: getAutonomySessionStartHookSh(),
-        description: "autonomy session-start hook",
-        executable: true,
-      },
-    ];
+      });
+    }
 
-    // Remove obsolete commands
-    const obsoleteCommands = [
-      ".claude/commands/ramp.md",
-      ".claude/commands/plan.md",
-      ".claude/commands/ship-design.md",
-    ];
+    // Autonomy hooks (always add if missing - dormant until activated)
+    files.push({
+      path: ".claude/hooks/autonomy/stop-hook.sh",
+      content: getAutonomyStopHookSh(),
+      description: "autonomy stop hook",
+      executable: true,
+    });
+    files.push({
+      path: ".claude/hooks/autonomy/session-start-autonomy.sh",
+      content: getAutonomySessionStartHookSh(),
+      description: "autonomy session-start hook",
+      executable: true,
+    });
+
+    // Remove obsolete commands (skip if only adding hooks)
     let removed = 0;
-    for (const obsolete of obsoleteCommands) {
-      const obsoletePath = path.join(cwd, obsolete);
-      if (fs.existsSync(obsoletePath)) {
-        fs.unlinkSync(obsoletePath);
-        console.log(`  🗑️  Removed ${obsolete} (obsolete)`);
-        removed++;
+    if (!onlyAddingHooks) {
+      const obsoleteCommands = [
+        ".claude/commands/ramp.md",
+        ".claude/commands/plan.md",
+        ".claude/commands/ship-design.md",
+      ];
+      for (const obsolete of obsoleteCommands) {
+        const obsoletePath = path.join(cwd, obsolete);
+        if (fs.existsSync(obsoletePath)) {
+          fs.unlinkSync(obsoletePath);
+          console.log(`  🗑️  Removed ${obsolete} (obsolete)`);
+          removed++;
+        }
       }
     }
 
@@ -271,13 +291,20 @@ export const upgradeCommand = new Command("upgrade")
       console.log(`   Settings: hooks configured`);
     }
 
-    console.log("\nCommands:");
-    console.log("  • /ship — Unified command (auto-detects mode: design, continue, planning)");
-    console.log("  • /status — Quick health check\n");
+    if (onlyAddingHooks) {
+      // Minimal output for hooks-only upgrade
+      console.log("\nNew capability:");
+      console.log("  • shiplog autopilot --use-hooks — Lightweight autonomy mode\n");
+    } else {
+      console.log("\nCommands:");
+      console.log("  • /ship — Unified command (auto-detects mode: design, continue, planning)");
+      console.log("  • /status — Quick health check");
+      console.log("  • shiplog autopilot --use-hooks — Lightweight autonomy mode\n");
 
-    console.log("Your content files were preserved:");
-    console.log("  • docs/PROGRESS.md");
-    console.log("  • docs/DECISIONS.md");
-    console.log("  • docs/HANDOFF.md");
-    console.log("  • docs/sprints/*\n");
+      console.log("Your content files were preserved:");
+      console.log("  • docs/PROGRESS.md");
+      console.log("  • docs/DECISIONS.md");
+      console.log("  • docs/HANDOFF.md");
+      console.log("  • docs/sprints/*\n");
+    }
   });
