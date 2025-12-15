@@ -43,7 +43,7 @@ export const initCommand = new Command("init")
     console.log(`\n🚢 Initializing shiplog for: ${projectName}\n`);
 
     // Create directories
-    const dirs = [".claude/commands", ".claude/hooks", "docs", "docs/sprints"];
+    const dirs = [".claude/commands", ".claude/hooks", ".claude/hooks/autonomy", "docs", "docs/sprints"];
     for (const dir of dirs) {
       const dirPath = path.join(cwd, dir);
       if (!fs.existsSync(dirPath)) {
@@ -106,6 +106,18 @@ export const initCommand = new Command("init")
       {
         path: ".claude/hooks/session-start.sh",
         content: getSessionStartHookSh(),
+        minimalInclude: true,
+      },
+
+      // Autonomy hooks (dormant until activated)
+      {
+        path: ".claude/hooks/autonomy/stop-hook.sh",
+        content: getAutonomyStopHookSh(),
+        minimalInclude: true,
+      },
+      {
+        path: ".claude/hooks/autonomy/session-start-autonomy.sh",
+        content: getAutonomySessionStartHookSh(),
         minimalInclude: true,
       },
 
@@ -832,6 +844,15 @@ function getSETTINGSjson(): string {
             "command": "bash $CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh"
           }
         ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash $CLAUDE_PROJECT_DIR/.claude/hooks/autonomy/session-start-autonomy.sh"
+          }
+        ]
       }
     ],
     "SessionEnd": [
@@ -841,6 +862,16 @@ function getSETTINGSjson(): string {
           {
             "type": "command",
             "command": "bash $CLAUDE_PROJECT_DIR/.claude/hooks/session-end.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash $CLAUDE_PROJECT_DIR/.claude/hooks/autonomy/stop-hook.sh"
           }
         ]
       }
@@ -1159,6 +1190,107 @@ exit 0
 `;
 }
 
+// Autonomy hook scripts (dormant until .shiplog/autonomy-active exists)
+function getAutonomyStopHookSh(): string {
+  return `#!/bin/bash
+# Shiplog Autonomy Stop Hook
+# Blocks Claude from stopping unless escape phrase is detected or max iterations reached.
+# This hook is dormant unless .shiplog/autonomy-active exists.
+
+set +e  # Don't exit on error - we need to handle gracefully
+
+ACTIVATION_FILE=".shiplog/autonomy-active"
+
+# Not in autonomy mode? Pass through silently
+if [ ! -f "$ACTIVATION_FILE" ]; then
+  exit 0
+fi
+
+# Read activation state
+if ! STATE=$(cat "$ACTIVATION_FILE" 2>/dev/null); then
+  # Can't read file - allow stop
+  exit 0
+fi
+
+# Parse state (with defaults if jq unavailable or fields missing)
+if command -v jq &> /dev/null; then
+  ITERATION=$(echo "$STATE" | jq -r '.iteration // 0')
+  MAX_ITER=$(echo "$STATE" | jq -r '.maxIterations // 20')
+else
+  # Fallback: simple grep for iteration count
+  ITERATION=$(echo "$STATE" | grep -o '"iteration":[0-9]*' | grep -o '[0-9]*' || echo "0")
+  MAX_ITER=$(echo "$STATE" | grep -o '"maxIterations":[0-9]*' | grep -o '[0-9]*' || echo "20")
+fi
+
+# Read stdin (Claude's output before stopping)
+INPUT=$(cat)
+
+# Check for escape phrases
+if echo "$INPUT" | grep -qE "SHIPLOG_DONE|SHIPLOG_NEED_USER"; then
+  # Escape phrase detected - allow stop
+  exit 0
+fi
+
+# Check max iterations (safety valve)
+if [ "$ITERATION" -ge "$MAX_ITER" ]; then
+  echo "Autonomy: Max iterations reached ($MAX_ITER). Stopping."
+  exit 0
+fi
+
+# Increment iteration counter
+NEW_ITER=$((ITERATION + 1))
+if command -v jq &> /dev/null; then
+  echo "$STATE" | jq ".iteration = $NEW_ITER" > "$ACTIVATION_FILE"
+else
+  # Fallback: sed replacement
+  sed -i.bak "s/\\"iteration\\":[0-9]*/\\"iteration\\":$NEW_ITER/" "$ACTIVATION_FILE" 2>/dev/null || true
+fi
+
+# Block stop - tell Claude to keep going
+# Output JSON that Claude Code understands
+cat << 'EOF'
+{"decision": "block", "reason": "Keep working! You're in autonomy mode. Say SHIPLOG_DONE when the task is complete, or SHIPLOG_NEED_USER if you need human input."}
+EOF
+`;
+}
+
+function getAutonomySessionStartHookSh(): string {
+  return `#!/bin/bash
+# Shiplog Autonomy Session Start Hook
+# Shows autonomy status when active. Dormant unless .shiplog/autonomy-active exists.
+
+set +e  # Don't exit on error
+
+ACTIVATION_FILE=".shiplog/autonomy-active"
+
+# Not in autonomy mode? Silent pass through
+if [ ! -f "$ACTIVATION_FILE" ]; then
+  exit 0
+fi
+
+# Read activation state
+if ! STATE=$(cat "$ACTIVATION_FILE" 2>/dev/null); then
+  exit 0
+fi
+
+# Parse state
+if command -v jq &> /dev/null; then
+  ITERATION=$(echo "$STATE" | jq -r '.iteration // 0')
+  MAX_ITER=$(echo "$STATE" | jq -r '.maxIterations // 20')
+else
+  ITERATION=$(echo "$STATE" | grep -o '"iteration":[0-9]*' | grep -o '[0-9]*' || echo "0")
+  MAX_ITER=$(echo "$STATE" | grep -o '"maxIterations":[0-9]*' | grep -o '[0-9]*' || echo "20")
+fi
+
+# Display autonomy status
+echo ""
+echo "AUTONOMY MODE ACTIVE (iteration $ITERATION/$MAX_ITER)"
+echo "  Say SHIPLOG_DONE when the task is complete"
+echo "  Say SHIPLOG_NEED_USER if you need human input"
+echo ""
+`;
+}
+
 // Export template functions for upgrade command
 export {
   getSHIPmd,
@@ -1166,4 +1298,6 @@ export {
   getSessionEndHookSh,
   getSessionStartHookSh,
   getSETTINGSjson,
+  getAutonomyStopHookSh,
+  getAutonomySessionStartHookSh,
 };

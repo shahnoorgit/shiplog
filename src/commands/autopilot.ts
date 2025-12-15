@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import * as fs from "fs";
 import * as path from "path";
-import { execSync } from "child_process";
+import { execSync, spawn } from "child_process";
 import {
   query,
   type Options,
@@ -272,6 +272,7 @@ interface AutopilotOptions {
   resume: boolean; // Continue from interrupted state
   fresh: boolean; // Start fresh, ignore existing state
   dryRun: boolean;
+  useHooks: boolean; // Use native Claude Code hooks instead of SDK
 }
 
 interface SessionLog {
@@ -1621,6 +1622,120 @@ function extractLearnings(
   }
 }
 
+/**
+ * Check if autonomy hooks are installed in the project
+ */
+function hooksInstalled(cwd: string): boolean {
+  const stopHook = path.join(cwd, ".claude/hooks/autonomy/stop-hook.sh");
+  const sessionStartHook = path.join(cwd, ".claude/hooks/autonomy/session-start-autonomy.sh");
+  return fs.existsSync(stopHook) && fs.existsSync(sessionStartHook);
+}
+
+/**
+ * Run autonomy mode using native Claude Code hooks.
+ * This is a lighter alternative to the SDK-based autopilot that preserves
+ * the natural Claude Code experience while adding "keep going" behavior.
+ *
+ * How it works:
+ * 1. Create .shiplog/autonomy-active file (activates dormant hooks)
+ * 2. Launch claude with inherited stdio (user interacts naturally)
+ * 3. Delete activation file on exit (hooks go dormant again)
+ *
+ * The hooks will:
+ * - Block Claude from stopping unless SHIPLOG_DONE or SHIPLOG_NEED_USER is said
+ * - Track iteration count and enforce max iterations
+ * - Show autonomy status on session start
+ */
+async function runHooksMode(cwd: string, maxIterations: number): Promise<void> {
+  console.log("\n" + "=".repeat(60));
+  console.log("  🚁 Shiplog Autonomy (Hooks Mode)");
+  console.log("=".repeat(60));
+
+  // Verify hooks are installed
+  if (!hooksInstalled(cwd)) {
+    console.log("\n❌ Autonomy hooks not installed.");
+    console.log("   Run 'shiplog upgrade' or 'shiplog init' first.\n");
+    process.exit(1);
+  }
+
+  console.log(`\n✅ Autonomy hooks detected`);
+  console.log(`🔄 Max iterations: ${maxIterations}`);
+  console.log(`\n📝 To stop autonomy:`);
+  console.log(`   • Say SHIPLOG_DONE when the task is complete`);
+  console.log(`   • Say SHIPLOG_NEED_USER if you need human input`);
+  console.log(`   • Press Ctrl+C to force stop\n`);
+
+  // Ensure .shiplog directory exists
+  const shiplogDir = path.join(cwd, ".shiplog");
+  if (!fs.existsSync(shiplogDir)) {
+    fs.mkdirSync(shiplogDir, { recursive: true });
+  }
+
+  // Create activation file
+  const activationPath = path.join(cwd, ".shiplog/autonomy-active");
+  const activationData = {
+    maxIterations,
+    iteration: 0,
+    startedAt: new Date().toISOString(),
+  };
+
+  fs.writeFileSync(activationPath, JSON.stringify(activationData, null, 2) + "\n");
+  console.log(`🔓 Autonomy activated (.shiplog/autonomy-active created)`);
+
+  // Cleanup function to remove activation file
+  const cleanup = () => {
+    try {
+      if (fs.existsSync(activationPath)) {
+        fs.unlinkSync(activationPath);
+        console.log(`\n🔒 Autonomy deactivated (.shiplog/autonomy-active removed)`);
+      }
+    } catch {
+      // Ignore cleanup errors
+    }
+  };
+
+  // Register cleanup handlers
+  process.on("SIGINT", () => {
+    cleanup();
+    process.exit(130);
+  });
+  process.on("SIGTERM", () => {
+    cleanup();
+    process.exit(143);
+  });
+
+  console.log(`\n🚀 Launching Claude Code...\n`);
+  console.log("-".repeat(60));
+
+  // Launch claude with inherited stdio for natural interaction
+  const claude = spawn("claude", [], {
+    stdio: "inherit",
+    cwd,
+    shell: true,
+  });
+
+  // Wait for claude to exit
+  await new Promise<void>((resolve, reject) => {
+    claude.on("exit", (code) => {
+      cleanup();
+      if (code === 0) {
+        resolve();
+      } else {
+        // Don't reject on non-zero exit - user may have used Ctrl+C
+        resolve();
+      }
+    });
+
+    claude.on("error", (err) => {
+      cleanup();
+      reject(err);
+    });
+  });
+
+  console.log("-".repeat(60));
+  console.log("\n✨ Autonomy session ended\n");
+}
+
 export const autopilotCommand = new Command("autopilot")
   .description(
     `Let Claude drive your project autonomously for hours.
@@ -1739,18 +1854,33 @@ EXAMPLES
     "Preview the prompt and settings without running Claude",
     false
   )
+  .option(
+    "--use-hooks",
+    "Use native Claude Code hooks for autonomy (lighter weight, natural interaction)",
+    false
+  )
   .action(async (options: AutopilotOptions) => {
     const cwd = process.cwd();
+
+    // Parse maxIterations early (needed for both modes)
+    const maxIterations =
+      typeof options.maxIterations === "string"
+        ? parseInt(options.maxIterations, 10)
+        : options.maxIterations;
+
+    // Use hooks mode if --use-hooks flag is set
+    if (options.useHooks) {
+      await runHooksMode(cwd, maxIterations);
+      return;
+    }
+
+    // --- SDK-based autopilot mode (default) ---
 
     // Set up interrupt handling for graceful Ctrl+C
     currentCwd = cwd;
     setupInterruptHandler();
 
-    // Parse numeric options
-    const maxIterations =
-      typeof options.maxIterations === "string"
-        ? parseInt(options.maxIterations, 10)
-        : options.maxIterations;
+    // Parse numeric options (maxIterations already parsed above)
     const stallThreshold =
       typeof options.stallThreshold === "string"
         ? parseInt(options.stallThreshold, 10)

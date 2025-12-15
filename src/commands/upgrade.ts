@@ -7,6 +7,8 @@ import {
   getSessionEndHookSh,
   getSessionStartHookSh,
   getSETTINGSjson,
+  getAutonomyStopHookSh,
+  getAutonomySessionStartHookSh,
 } from "./init.js";
 
 interface UpgradeOptions {
@@ -67,7 +69,7 @@ export const upgradeCommand = new Command("upgrade")
     }
 
     // Create directories if missing
-    const dirs = [".claude/commands", ".claude/hooks", "docs/sprints"];
+    const dirs = [".claude/commands", ".claude/hooks", ".claude/hooks/autonomy", "docs/sprints"];
     for (const dir of dirs) {
       const dirPath = path.join(cwd, dir);
       if (!fs.existsSync(dirPath)) {
@@ -113,6 +115,19 @@ export const upgradeCommand = new Command("upgrade")
         path: ".claude/hooks/session-start.sh",
         content: getSessionStartHookSh(),
         description: "session-start hook",
+        executable: true,
+      },
+      // Autonomy hooks (dormant until activated)
+      {
+        path: ".claude/hooks/autonomy/stop-hook.sh",
+        content: getAutonomyStopHookSh(),
+        description: "autonomy stop hook",
+        executable: true,
+      },
+      {
+        path: ".claude/hooks/autonomy/session-start-autonomy.sh",
+        content: getAutonomySessionStartHookSh(),
+        description: "autonomy session-start hook",
         executable: true,
       },
     ];
@@ -165,32 +180,70 @@ export const upgradeCommand = new Command("upgrade")
       try {
         const existingSettings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
 
-        // Check if hooks already configured
+        // Check if hooks already configured, add missing ones
+        let hooksModified = false;
+
         if (!existingSettings.hooks) {
-          existingSettings.hooks = {
-            SessionStart: [
-              {
-                matcher: "",
-                hooks: [
-                  {
-                    type: "command",
-                    command: "bash $CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh"
-                  }
-                ]
-              }
-            ],
-            SessionEnd: [
-              {
-                matcher: "",
-                hooks: [
-                  {
-                    type: "command",
-                    command: "bash $CLAUDE_PROJECT_DIR/.claude/hooks/session-end.sh"
-                  }
-                ]
-              }
-            ]
-          };
+          existingSettings.hooks = {};
+        }
+
+        // Add SessionStart hooks if missing
+        if (!existingSettings.hooks.SessionStart) {
+          existingSettings.hooks.SessionStart = [
+            {
+              matcher: "",
+              hooks: [
+                {
+                  type: "command",
+                  command: "bash $CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh"
+                }
+              ]
+            },
+            {
+              matcher: "",
+              hooks: [
+                {
+                  type: "command",
+                  command: "bash $CLAUDE_PROJECT_DIR/.claude/hooks/autonomy/session-start-autonomy.sh"
+                }
+              ]
+            }
+          ];
+          hooksModified = true;
+        }
+
+        // Add SessionEnd hooks if missing
+        if (!existingSettings.hooks.SessionEnd) {
+          existingSettings.hooks.SessionEnd = [
+            {
+              matcher: "",
+              hooks: [
+                {
+                  type: "command",
+                  command: "bash $CLAUDE_PROJECT_DIR/.claude/hooks/session-end.sh"
+                }
+              ]
+            }
+          ];
+          hooksModified = true;
+        }
+
+        // Add Stop hook if missing (for autonomy mode)
+        if (!existingSettings.hooks.Stop) {
+          existingSettings.hooks.Stop = [
+            {
+              hooks: [
+                {
+                  type: "command",
+                  command: "bash $CLAUDE_PROJECT_DIR/.claude/hooks/autonomy/stop-hook.sh"
+                }
+              ]
+            }
+          ];
+          hooksModified = true;
+        }
+
+        if (hooksModified) {
           fs.writeFileSync(settingsPath, JSON.stringify(existingSettings, null, 2) + "\n");
           console.log(`  🔄 Updated .claude/settings.json (added hooks, preserved mcpServers)`);
           settingsUpdated = true;
