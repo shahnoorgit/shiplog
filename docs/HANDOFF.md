@@ -2,67 +2,64 @@
 
 > Capture current session state so the next session can pick up seamlessly.
 
-**Last Updated:** 2025-12-12
-**Status:** Command Consolidation Complete
+**Last Updated:** 2025-12-15
+**Status:** v1.8.0 Ready
 
 ---
 
 ## What Was Done This Session
 
-### Command Consolidation
+### MCP Tools Enhancement (v1.8.0)
 
-Consolidated all commands into a unified `/ship` with automatic mode detection:
+Added new MCP tool and fixed hook configuration:
 
-1. **Design Mode** - Triggers on UI/UX keywords, uses frontend-design skill, skips sprint ceremony
-2. **Continue Mode** - Active sprint with incomplete features
-3. **Planning Mode** - Creates sprint then starts working immediately (fixed autopilot gap)
-4. **Quick Task Mode** - Bug fixes without sprint overhead
+1. **update_sprint MCP Tool** - Allows autopilot Claude to mark features complete without manually editing JSON
+   - Feature lookup by ID or description substring
+   - Atomic passes status updates
+   - Note appending with timestamps
+   - Auto-completion when all features pass
+
+2. **Stop Hook Fix** - Added missing `matcher: ""` field to Stop hook configuration
+   - Fixed in init.ts (getSETTINGSjson)
+   - Fixed in upgrade.ts
+   - Extended doctor.ts validation to include Stop hooks
 
 ### Files Changed
 
 ```
-.claude/commands/ship.md        # Updated with 4-mode auto-detection
-.claude/commands/status.md      # Updated to reference /ship only
-.claude/commands/plan.md        # DELETED (obsolete)
-.claude/commands/ramp.md        # DELETED (obsolete)
-.claude/commands/ship-design.md # DELETED (obsolete)
-src/commands/init.ts            # Updated to only create ship.md + status.md
-src/commands/upgrade.ts         # Now removes obsolete commands
-src/commands/doctor.ts          # Simplified version detection
-src/__tests__/e2e.test.ts       # Updated tests for new command structure
+src/commands/autopilot.ts       # Added update_sprint MCP tool (~100 lines)
+src/commands/init.ts            # Fixed Stop hook matcher
+src/commands/upgrade.ts         # Fixed Stop hook matcher
+src/commands/doctor.ts          # Extended hook validation to include Stop
+src/__tests__/e2e.test.ts       # Added 5 new tests for sprint operations
+docs/DECISIONS.md               # Documented update_sprint decision
+docs/PROGRESS.md                # Updated with v1.8.0 changes
+package.json                    # Version bump to 1.8.0
 ```
-
-### Key Changes
-
-- `/ship` now auto-detects mode from user message content
-- Design work detected by keywords: UI, UX, design, visual, layout, styles, CSS, etc.
-- Planning mode explicitly says "START WORKING IMMEDIATELY" after creating sprint
-- `shiplog upgrade` removes obsolete command files during upgrade
 
 ---
 
 ## Current State
 
-- **Git:** Clean, changes committed to main
-- **Tests:** 43 tests passing
+- **Git:** Clean, 4 commits on main ahead of origin
+- **Tests:** 49 tests passing (up from 44)
 - **Build:** Passing
-- **Version:** Ready for v1.7.0 release
+- **Version:** 1.8.0
 
 ---
 
 ## What's Next
 
-1. **Publish v1.7.0** - Command consolidation release
-2. **Test the workflow** - Try `/ship` on a real project with design work
+1. **Publish v1.8.0** - MCP tools enhancement release
+2. **Test update_sprint** - Verify autopilot uses the new tool correctly
 3. **Promote / share** - Tweet, post, get feedback
 
 ---
 
 ## Open Questions for Human
 
-1. **Ready to publish v1.7.0?** - All tests pass, command consolidation complete
-2. **Test the design mode** - Does auto-detection feel natural for design work?
-3. **Try the new planning flow** - Does it feel better to start working immediately?
+1. **Ready to publish v1.8.0?** - All tests pass
+2. **Push to origin?** - 4 commits ready to push
 
 ---
 
