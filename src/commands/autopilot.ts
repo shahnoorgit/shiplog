@@ -1737,76 +1737,59 @@ async function runHooksMode(cwd: string, maxIterations: number): Promise<void> {
 
 export const autopilotCommand = new Command("autopilot")
   .description(
-    `Let Claude drive your project autonomously for hours.
+    `Let Claude drive your project autonomously.
 
-WHAT IT DOES
-  Runs Claude Code in a loop. Each session works on your sprint until context
-  fills up. Then autopilot extracts learnings, restarts Claude with fresh
-  context + accumulated knowledge, and continues. Walk away. Come back to
-  finished work.
+TWO MODES
+  shiplog autopilot              SDK mode (default) - full featured
+  shiplog autopilot --use-hooks  Hooks mode - lightweight, native feel
 
-THE LOOP
-  ┌─────────────────────────────────────────────────────────────────────┐
-  │  1. START    → Claude reads sprint, picks next feature, works on it │
-  │  2. WORK     → Claude commits frequently, updates sprint progress   │
-  │  3. EXIT     → Context fills up, Claude exits naturally             │
-  │  4. LEARN    → Autopilot extracts learnings from commits            │
-  │  5. RESTART  → Fresh Claude session with learnings injected         │
-  │  6. REPEAT   → Until sprint complete or stall detected              │
-  └─────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│  SDK MODE (default)                                                     │
+│  Uses Claude Agent SDK for maximum autonomy and intelligence            │
+├─────────────────────────────────────────────────────────────────────────┤
+│  ✓ Multi-session loop with automatic restarts                           │
+│  ✓ Sprint memory - remembers what worked/failed across sessions         │
+│  ✓ Learning extraction - updates SKILLBOOK.md automatically             │
+│  ✓ Review sub-agent - independent code review before marking done       │
+│  ✓ Stall detection - stops if stuck                                     │
+│  ✓ Cost tracking - budget limits per session                            │
+│  ✓ Sub-agents (Explore, Plan) for parallel work                         │
+│  ✗ Requires active sprint file in docs/sprints/                         │
+│  ✗ No interactive input during sessions                                 │
+└─────────────────────────────────────────────────────────────────────────┘
 
-WHAT YOU'LL SEE
-  ============================================================
-    🚁 Shiplog Autopilot
-  ============================================================
+┌─────────────────────────────────────────────────────────────────────────┐
+│  HOOKS MODE (--use-hooks)                                               │
+│  Uses native Claude Code with shell hooks for "keep going" behavior     │
+├─────────────────────────────────────────────────────────────────────────┤
+│  ✓ Natural Claude Code experience (all tools, MCP servers, etc.)        │
+│  ✓ Interactive - you can still type during sessions                     │
+│  ✓ Lightweight - just adds "keep going" via PreToolUse hooks            │
+│  ✓ No sprint file required                                              │
+│  ✗ Single session (no multi-session memory)                             │
+│  ✗ No automatic learning extraction                                     │
+│  ✗ No review sub-agent                                                  │
+│  Claude stops when it says SHIPLOG_DONE or SHIPLOG_NEED_USER            │
+└─────────────────────────────────────────────────────────────────────────┘
 
-  📋 Initiative: Add user authentication
-  📌 Current task: Implement login form
-  🔄 Max iterations: 20
-  ⏸️  Stall threshold: 3 iterations
-
-  ------------------------------------------------------------
-    SESSION 1/20
-  ------------------------------------------------------------
-  🚀 Starting Claude session...
-
-  [Claude works here - you'll see its output]
-
-  📊 Session 1 Results:
-     Commits made: 7
-     Total commits: 7
-  📚 Updated SKILLBOOK.md with 2 learnings
-
-  ⏳ Starting next iteration in 3 seconds...
-
-SAFETY & GUARDRAILS
-  • Stall detection   - Stops if no commits for N sessions (default: 3)
-  • Max iterations    - Hard limit on sessions (default: 20)
-  • Git-based         - Only counts real commits as progress
-  • Interruptible     - Ctrl+C stops cleanly, state is saved
-  • Dry-run mode      - Preview everything without running Claude
-
-PREREQUISITES
-  1. Active sprint file in docs/sprints/ with status: "in_progress"
-  2. At least one feature with passes: false
-  3. Git repository (commits are how progress is measured)
-
-  No sprint? Run 'claude' first and use /ship to create one.
-
-FILES CREATED
-  .shiplog/                    - Session data directory (gitignored)
-  .shiplog/autopilot-state.json - Current run state (resume support)
-  .shiplog/sessions/           - Individual session logs
-  docs/SKILLBOOK.md            - Accumulated learnings (persists)
+WHICH TO USE?
+  • SDK mode    - Long autonomous runs (hours), complex sprints, walk away
+  • Hooks mode  - Quick autonomy boost, want to stay interactive, no sprint
 
 EXAMPLES
-  $ shiplog autopilot              # Start with sensible defaults (Sonnet)
-  $ shiplog autopilot --dry-run    # See what would happen, don't run
-  $ shiplog autopilot -m opus      # Use Claude Opus (slower, more capable)
-  $ shiplog autopilot -m haiku     # Use Claude Haiku (faster, cheaper)
-  $ shiplog autopilot -n 50        # Allow up to 50 sessions
-  $ shiplog autopilot -s 5         # More patience before stall detection
-  $ shiplog autopilot -n 10 -s 2   # Quick run, fail fast on stalls`
+  $ shiplog autopilot              # SDK mode with defaults (Sonnet)
+  $ shiplog autopilot --use-hooks  # Hooks mode - launch and interact
+  $ shiplog autopilot -m opus      # SDK mode with Opus (smarter)
+  $ shiplog autopilot -n 50        # SDK mode, allow 50 sessions
+  $ shiplog autopilot --dry-run    # Preview SDK mode without running
+
+SDK MODE PREREQUISITES
+  1. Active sprint file in docs/sprints/ with status: "in_progress"
+  2. At least one feature with passes: false
+  No sprint? Run 'claude' first and use /ship to create one.
+
+HOOKS MODE PREREQUISITES
+  Run 'shiplog init' or 'shiplog upgrade' to install autonomy hooks.`
   )
   .option(
     "-n, --max-iterations <n>",
@@ -1855,7 +1838,7 @@ EXAMPLES
   )
   .option(
     "--use-hooks",
-    "Use native Claude Code hooks for autonomy (lighter weight, natural interaction)",
+    "Hooks mode: native Claude Code with 'keep going' behavior (see help for details)",
     false
   )
   .action(async (options: AutopilotOptions) => {
