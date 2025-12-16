@@ -252,6 +252,7 @@ export const upgradeCommand = new Command("upgrade")
         if (!existingSettings.hooks.Stop) {
           existingSettings.hooks.Stop = [
             {
+              matcher: "",
               hooks: [
                 {
                   type: "command",

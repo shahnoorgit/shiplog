@@ -144,7 +144,7 @@ export const doctorCommand = new Command("doctor")
         // Check hooks format
         if (settings.hooks) {
           let hooksValid = true;
-          const hookEvents = ["SessionStart", "SessionEnd"];
+          const hookEvents = ["SessionStart", "SessionEnd", "Stop"];
 
           for (const event of hookEvents) {
             if (settings.hooks[event]) {

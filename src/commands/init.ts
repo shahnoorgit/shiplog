@@ -868,6 +868,7 @@ function getSETTINGSjson(): string {
     ],
     "Stop": [
       {
+        "matcher": "",
         "hooks": [
           {
             "type": "command",
