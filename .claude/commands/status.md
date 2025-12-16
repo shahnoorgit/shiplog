@@ -75,4 +75,4 @@ End with a clear recommendation:
 
 ---
 
-**Tip:** Run /status at the start of any session for a quick health check.
+**Tip:** Run /status at the start of any session to quickly understand state without diving into work.
