@@ -948,3 +948,141 @@ describe('sprint file operations', () => {
     expect(updated.features[0].notes).toContain('Added new implementation detail');
   });
 });
+
+describe('shiplog status', () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = createTempDir();
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('shows error when not initialized', () => {
+    const output = runShiplog('status', tempDir, true);
+    expect(output).toContain('No shiplog installation found');
+  });
+
+  it('shows no sprint message when no sprints exist', () => {
+    runShiplog('init', tempDir);
+    const output = runShiplog('status', tempDir);
+    expect(output).toContain('No active sprint found');
+  });
+
+  it('shows sprint progress correctly', () => {
+    runShiplog('init', tempDir);
+
+    // Create a test sprint
+    const sprintPath = path.join(tempDir, 'docs/sprints/2025-01-14-test.json');
+    fs.writeFileSync(sprintPath, JSON.stringify({
+      initiative: 'Test Feature',
+      status: 'in_progress',
+      created: '2025-01-14',
+      features: [
+        { id: 'feat-001', description: 'First feature', passes: true },
+        { id: 'feat-002', description: 'Second feature', passes: false },
+      ]
+    }, null, 2));
+
+    const output = runShiplog('status', tempDir);
+    expect(output).toContain('Test Feature');
+    expect(output).toContain('1/2');
+    expect(output).toContain('50%');
+    expect(output).toContain('First feature');
+    expect(output).toContain('Second feature');
+  });
+
+  it('outputs JSON with --json flag', () => {
+    runShiplog('init', tempDir);
+
+    // Create a test sprint
+    const sprintPath = path.join(tempDir, 'docs/sprints/2025-01-14-test.json');
+    fs.writeFileSync(sprintPath, JSON.stringify({
+      initiative: 'JSON Test',
+      status: 'in_progress',
+      created: '2025-01-14',
+      features: [
+        { id: 'feat-001', description: 'Feature one', passes: true },
+      ]
+    }, null, 2));
+
+    const output = runShiplog('status --json', tempDir);
+    const json = JSON.parse(output);
+    expect(json.project).toBeDefined();
+    expect(json.sprint).toBeDefined();
+    expect(json.sprint.name).toBe('JSON Test');
+    expect(json.sprint.progress.completed).toBe(1);
+    expect(json.sprint.progress.total).toBe(1);
+    expect(json.sprint.progress.percentage).toBe(100);
+  });
+
+  it('shows specific sprint with --sprint flag', () => {
+    runShiplog('init', tempDir);
+
+    // Create two sprints
+    fs.writeFileSync(
+      path.join(tempDir, 'docs/sprints/2025-01-10-old.json'),
+      JSON.stringify({
+        initiative: 'Old Sprint',
+        status: 'completed',
+        created: '2025-01-10',
+        features: [{ id: 'f1', description: 'Old feature', passes: true }]
+      }, null, 2)
+    );
+    fs.writeFileSync(
+      path.join(tempDir, 'docs/sprints/2025-01-14-new.json'),
+      JSON.stringify({
+        initiative: 'New Sprint',
+        status: 'in_progress',
+        created: '2025-01-14',
+        features: [{ id: 'f1', description: 'New feature', passes: false }]
+      }, null, 2)
+    );
+
+    // Request specific old sprint
+    const output = runShiplog('status --sprint old', tempDir);
+    expect(output).toContain('Old Sprint');
+    expect(output).not.toContain('New Sprint');
+  });
+
+  it('shows last session info when metadata exists', () => {
+    runShiplog('init', tempDir);
+
+    // Create session metadata
+    fs.writeFileSync(
+      path.join(tempDir, '.claude/session-metadata.jsonl'),
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        reason: 'context_exhausted',
+        files_changed: ['file1.ts', 'file2.ts'],
+        recent_commits: []
+      }) + '\n'
+    );
+
+    const output = runShiplog('status', tempDir);
+    expect(output).toContain('Last Session');
+    expect(output).toContain('context_exhausted');
+    expect(output).toContain('Files changed: 2');
+  });
+
+  it('fails gracefully with specific sprint not found', () => {
+    runShiplog('init', tempDir);
+
+    // Create one sprint
+    fs.writeFileSync(
+      path.join(tempDir, 'docs/sprints/2025-01-14-exists.json'),
+      JSON.stringify({
+        initiative: 'Existing Sprint',
+        status: 'in_progress',
+        created: '2025-01-14',
+        features: []
+      }, null, 2)
+    );
+
+    const output = runShiplog('status --sprint nonexistent', tempDir, true);
+    expect(output).toContain('Sprint file not found');
+    expect(output).toContain('Available sprints');
+  });
+});

@@ -9,6 +9,7 @@ import { upgradeCommand } from "./commands/upgrade.js";
 import { doctorCommand } from "./commands/doctor.js";
 import { autopilotCommand } from "./commands/autopilot.js";
 import { resetCommand } from "./commands/reset.js";
+import { statusCommand } from "./commands/status.js";
 
 // Read version from package.json
 const __filename = fileURLToPath(import.meta.url);
@@ -34,5 +35,6 @@ program.addCommand(upgradeCommand);
 program.addCommand(doctorCommand);
 program.addCommand(autopilotCommand);
 program.addCommand(resetCommand);
+program.addCommand(statusCommand);
 
 program.parse();

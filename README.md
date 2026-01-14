@@ -421,6 +421,11 @@ shiplog autopilot --max-budget 10 # $10 budget per session
 # Check installation health
 shiplog doctor
 shiplog doctor --fix              # Auto-fix issues
+
+# Show sprint status
+shiplog status
+shiplog status --json             # Output as JSON
+shiplog status -s my-sprint       # Show specific sprint
 ```
 
 ---
